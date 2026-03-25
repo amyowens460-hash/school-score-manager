@@ -8,12 +8,13 @@
     <script>
         tailwind.config = { darkMode: 'class', theme: { extend: {} } }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;600;700&family=Moul&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <!-- បន្ថែម Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <style>
         body { font-family: 'Kantumruy Pro', sans-serif; transition: background-color 0.3s, color 0.3s; display: flex; flex-direction: column; min-height: 100vh; }
         .vertical-text { writing-mode: vertical-rl; text-orientation: mixed; height: 130px; padding: 10px 4px; text-align: left; display: flex; align-items: center; }
@@ -123,21 +124,71 @@
             .tab-content:not(.active) { display: none !important; }
             .seating-select { appearance: none !important; border: none !important; background: transparent !important; text-align: center; font-weight: bold; padding: 0 !important; font-size: 10pt !important;}
             .print-footer { display: block !important; text-align: right; font-size: 9pt; margin-top: 15px; font-style: italic; color: #555 !important; }
+            
+            /* Certificate specific print styles */
+            .certificate-page { 
+                border: 12px double #1e40af !important; margin: 0 auto !important; height: 98vh !important; width: 100% !important; 
+                display: flex !important; flex-direction: column !important; justify-content: space-between !important; background-color: white !important; page-break-after: always !important; 
+            }
         }
     </style>
 </head>
 <body class="p-2 sm:p-4 md:p-6 bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
 
-    <div class="max-w-[1500px] mx-auto space-y-4 print-area flex-grow w-full">
+    <!-- ផ្ទាំង Login ដ៏ទំនើប (Glassmorphism Effect) -->
+    <div id="loginScreen" class="fixed inset-0 z-[100] flex items-center justify-center bg-gradient-to-br from-indigo-900 via-blue-900 to-purple-900 transition-opacity duration-500">
+        <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30"></div>
+        <div class="relative w-[90%] max-w-md bg-white/10 dark:bg-black/20 backdrop-blur-xl p-8 sm:p-10 rounded-[2rem] shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] border border-white/20">
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/20 text-white mb-4 shadow-inner border border-white/30">
+                    <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                </div>
+                <h2 class="text-2xl sm:text-3xl font-bold text-white font-khmer mb-1">ចូលប្រព័ន្ធគ្រប់គ្រង</h2>
+                <p class="text-blue-200 text-sm mt-2 font-medium tracking-wide">SCHOOL MANAGEMENT SYSTEM</p>
+            </div>
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-bold text-blue-100 mb-2">អ៊ីមែល (Email)</label>
+                    <input type="email" id="loginEmail" required class="w-full px-5 py-3 rounded-xl border border-white/20 bg-white/10 text-white placeholder-blue-300 focus:ring-2 focus:ring-blue-400 focus:bg-white/20 outline-none transition duration-300 shadow-inner" placeholder="admin@school.com">
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-sm font-bold text-blue-100">ពាក្យសម្ងាត់ (Password)</label>
+                        <a href="#" onclick="handleForgotPassword(event)" class="text-sm font-medium text-blue-300 hover:text-blue-100 transition underline decoration-blue-400/30 underline-offset-2">ភ្លេចពាក្យសម្ងាត់?</a>
+                    </div>
+                    <input type="password" id="loginPassword" required class="w-full px-5 py-3 rounded-xl border border-white/20 bg-white/10 text-white placeholder-blue-300 focus:ring-2 focus:ring-blue-400 focus:bg-white/20 outline-none transition duration-300 shadow-inner" placeholder="••••••••">
+                </div>
+                <div id="loginError" class="hidden text-red-200 text-sm font-bold text-center bg-red-900/50 border border-red-500/50 p-3 rounded-xl backdrop-blur-md"></div>
+                <button type="submit" id="loginBtn" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-lg transform transition hover:-translate-y-1 hover:shadow-xl flex justify-center items-center gap-2 border border-blue-400/30">
+                    <span id="loginBtnText" class="text-lg">ចូលប្រព័ន្ធ</span>
+                    <svg id="loginSpinner" class="hidden w-5 h-5 animate-spin text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ខ្លឹមសារកម្មវិធីទាំងមូល (លាក់សិនពេលមិនទាន់ Login) -->
+    <div id="mainAppContainer" class="hidden flex-col w-full h-full flex-grow">
+        <div class="max-w-[1500px] mx-auto space-y-4 print-area flex-grow w-full">
         <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 no-print">
             <div class="text-center sm:text-left">
                 <h1 class="text-2xl sm:text-3xl font-bold text-blue-700 dark:text-blue-400 mb-1">ប្រព័ន្ធគ្រប់គ្រងពិន្ទុសិស្ស v18.2</h1>
                 <p class="text-sm text-gray-500 dark:text-gray-400">Classroom Management System</p>
             </div>
-            <button onclick="toggleTheme()" class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-                <span id="themeIcon" class="text-xl">🌙</span>
-                <span id="themeText" class="font-bold text-sm">Dark Mode</span>
-            </button>
+            <div class="flex items-center gap-2">
+                <button onclick="toggleTheme()" class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                    <span id="themeIcon" class="text-xl">🌙</span>
+                    <span id="themeText" class="font-bold text-sm">Dark Mode</span>
+                </button>
+                <button onclick="openChangePasswordModal()" class="flex items-center gap-2 px-4 py-2 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-800 rounded-full shadow-sm hover:bg-yellow-100 dark:hover:bg-yellow-900/50 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+                    <span class="font-bold text-sm hidden sm:inline">ប្តូរលេខសម្ងាត់</span>
+                </button>
+                <button onclick="handleLogout()" class="flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-full shadow-sm hover:bg-red-100 dark:hover:bg-red-900/50 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    <span class="font-bold text-sm hidden sm:inline">ចាកចេញ</span>
+                </button>
+            </div>
         </div>
 
         <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col xl:flex-row justify-between items-center gap-4 no-print">
@@ -409,7 +460,10 @@
         <div id="honorRollDetail" class="detail-view bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden p-6 print-area max-w-4xl mx-auto">
             <div class="flex items-center justify-between mb-6 no-print">
                 <button onclick="showDashboard()" class="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>ត្រឡប់ទៅទំព័រដើម</button>
-                <button onclick="printPortrait()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>ព្រីន (Portrait)</button>
+                <div class="flex gap-2">
+                    <button onclick="showCertificateView()" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition flex items-center gap-1.5 whitespace-nowrap"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>ប័ណ្ណសរសើរ (Top 3)</button>
+                    <button onclick="printPortrait()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>ព្រីនកិត្តិយស</button>
+                </div>
             </div>
             <div class="print-header-active text-center mb-8 border-b border-gray-200 dark:border-gray-700 pb-6">
                 <h2 class="displaySchoolName text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wide">...</h2>
@@ -421,6 +475,18 @@
             <div id="honorRollTreeContainer" class="mb-10 min-h-[400px]"></div>
             <div class="print-footer default-print-footer">
                 បង្កើតកម្មវិធីដោយ <b>HENG ROTHIVONG</b> | Telegram: t.me/Hengrothivong
+            </div>
+        </div>
+        
+        <!-- ផ្ទាំងសម្រាប់បង្ហាញប័ណ្ណសរសើរ -->
+        <div id="certificateDetail" class="detail-view max-w-[1200px] mx-auto print-area">
+            <div class="flex items-center justify-between mb-6 no-print bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+                <button onclick="showHonorRoll()" class="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition font-bold"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>ត្រឡប់ក្រោយ</button>
+                <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100 hidden sm:block">ប័ណ្ណសរសើរសម្រាប់សិស្សឆ្នើម (លេខ១ ដល់លេខ៣)</h2>
+                <button onclick="printLandscape()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm transition flex items-center gap-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg> ព្រីនប័ណ្ណ (Landscape)</button>
+            </div>
+            
+            <div id="certificateContainer" class="flex flex-col gap-10 items-center">
             </div>
         </div>
 
@@ -678,6 +744,23 @@
                     <button onclick="saveStudentRegistration()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-8 rounded-lg shadow-md transition w-full sm:w-auto">រក្សាទុកឈ្មោះ</button>
                 </div>
             </div>
+
+            <!-- ផ្នែក Backup & Restore -->
+            <div class="bg-indigo-50/50 dark:bg-gray-700/30 p-4 sm:p-6 rounded-xl border border-indigo-100 dark:border-gray-600 mt-8">
+                <h2 class="text-lg sm:text-xl font-bold text-indigo-800 dark:text-indigo-300 mb-2 border-b border-indigo-200 dark:border-gray-600 pb-2">៣. ទាញយក និងទាញបញ្ចូលទិន្នន័យ (Backup & Restore)</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">អ្នកគួរតែទាញយកទិន្នន័យទុក (Backup) ជារៀងរាល់ខែ ដើម្បីការពារការបាត់បង់ទិន្នន័យដោយយថាហេតុ។ ឯកសារដែលបានទាញយកនឹងមានទម្រង់ជា <b>.json</b> ។</p>
+                <div class="flex flex-wrap gap-3">
+                    <button onclick="backupData()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm transition flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> ទាញយក Backup (.json)
+                    </button>
+                    <div class="relative">
+                        <input type="file" id="restoreFileInput" accept=".json" class="hidden" onchange="restoreData(event)">
+                        <button onclick="document.getElementById('restoreFileInput').click()" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-sm transition flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg> ទាញបញ្ចូល Restore (.json)
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="scoreTab" class="detail-view bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 max-w-5xl mx-auto no-print">
@@ -701,6 +784,31 @@
             <span id="undoMessage" class="text-sm font-medium">បានលុបសិស្ស</span>
             <button onclick="undoDelete()" class="text-yellow-400 font-bold hover:underline text-sm">ត្រឡប់វិញ (Undo)</button>
             <button onclick="hideUndoToast()" class="text-gray-400 hover:text-white text-sm">✕</button>
+        </div>
+    </div>
+    </div>
+    
+    <!-- Change Password Modal -->
+    <div id="changePasswordModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity no-print">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-xl w-[90%] max-w-sm border border-gray-200 dark:border-gray-700">
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4">ប្តូរពាក្យសម្ងាត់ថ្មី</h3>
+            <input type="password" id="newPasswordInput" class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg mb-4 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium" placeholder="លេខសម្ងាត់ថ្មី (យ៉ាងតិច ៦ ខ្ទង់)">
+            <div id="cpwError" class="hidden text-red-500 text-sm mb-4 font-bold"></div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeChangePasswordModal()" class="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition font-bold">បោះបង់</button>
+                <button onclick="submitChangePassword()" id="btnSubmitCPW" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-bold flex items-center gap-2">រក្សាទុក</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Saving Overlay (ការពារការចុចផ្ទួនៗ) -->
+    <div id="globalSavingOverlay" class="fixed inset-0 z-[200] hidden items-center justify-center bg-black/30 backdrop-blur-sm transition-opacity no-print">
+        <div class="bg-white dark:bg-gray-800 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 border border-gray-200 dark:border-gray-700">
+            <svg class="animate-spin -ml-1 mr-2 h-6 w-6 text-blue-600 dark:text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="text-lg font-bold text-gray-800 dark:text-gray-100">កំពុងរក្សាទុក...</span>
         </div>
     </div>
 
@@ -753,30 +861,23 @@
             { id: 'sub_agri', name: 'កសិកម្ម' }, { id: 'sub_foreign', name: 'ភាសាបរទេស' }
         ];
 
-        let students = JSON.parse(localStorage.getItem('studentDataV12')) || [];
-        let schoolInfo = JSON.parse(localStorage.getItem('schoolInfoV12')) || {
-            schoolName: 'អនុវិទ្យាល័យ ម្រាក', province: 'កំពង់ធំ', title: 'តារាងកិត្តិយស', className: '៨ ក', academicYear: '២០២៥-២០២៦'
         // ១. ភ្ជាប់ Firebase ទៅគម្រោងរបស់អ្នក
         // សូមយក firebaseConfig ដែលអ្នកបានកូពីពី Firebase មកដាក់នៅទីនេះ
         const firebaseConfig = {
-            apiKey: "AIzaSyYourApiKeyHere...",
-            authDomain: "your-project-id.firebaseapp.com",
-            projectId: "your-project-id",
-            storageBucket: "your-project-id.appspot.com",
-            messagingSenderId: "1234567890",
-            appId: "1:1234567890:web:abcdef123456"
-        };
+            apiKey: "AIzaSyBeTiHB95rJcpjYZySnFgrpL8J5nVv67fo",
+            authDomain: "school-score-manager-a0d28.firebaseapp.com",
+            projectId: "school-score-manager-a0d28",
+            storageBucket: "school-score-manager-a0d28.firebasestorage.app",
+            messagingSenderId: "487936055905",
+            appId: "1:487936055905:web:ce8cf9711f96b168592820"
+            };
         
-        let scheduleData = JSON.parse(localStorage.getItem('scheduleDataV12')) || {};
-        let seatingData = JSON.parse(localStorage.getItem('seatingDataV12')) || {};
-        let bookBorrowingData = JSON.parse(localStorage.getItem('bookBorrowingDataV12')) || {};
-        // Add this line to store denominators per period
-        let periodDenominators = JSON.parse(localStorage.getItem('periodDenominatorsV12')) || {};
         // Initialize Firebase
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
         const db = firebase.firestore();
+        const auth = firebase.auth();
 
         // ២. អថេរសម្រាប់ផ្ទុកទិន្នន័យ (លុប localStorage ចេញ)
         let students = [];
@@ -901,9 +1002,8 @@
             let valText = document.getElementById('avgDenominator').value;
             if (valText !== '') {
                 periodDenominators[periodId] = parseFloat(valText);
-                localStorage.setItem('periodDenominatorsV12', JSON.stringify(periodDenominators));
-                // ដូរពី localStorage ទៅ Firebase
-                saveAllDataToFirebase();
+                // រក្សាទុកដោយស្ងាត់ៗ (មិនបង្ហាញ Loading ព្រោះវាកំពុងវាយ)
+                saveAllDataToFirebase(true);
                 refreshData();
             }
         }
@@ -915,6 +1015,7 @@
 
             if (document.getElementById('tableDetail').classList.contains('active') || document.getElementById('rankDetail').classList.contains('active')) renderTable();
             else if (document.getElementById('honorRollDetail').classList.contains('active')) renderHonorRoll();
+            else if (document.getElementById('certificateDetail') && document.getElementById('certificateDetail').classList.contains('active')) renderCertificates();
             else if (document.getElementById('reportDetail').classList.contains('active')) {
                 if(document.getElementById('tab_annual_report').classList.contains('active')) renderAnnualReport();
                 else renderReport();
@@ -1036,7 +1137,6 @@
             document.querySelectorAll('.schedule-cell').forEach(cell => {
                 scheduleData[cell.id] = cell.innerText;
             });
-            localStorage.setItem('scheduleDataV12', JSON.stringify(scheduleData));
             // ដូរពី localStorage ទៅ Firebase
             saveAllDataToFirebase();
             
@@ -1094,7 +1194,6 @@
             document.querySelectorAll('.seating-select').forEach(select => {
                 seatingData[select.id] = select.value;
             });
-            localStorage.setItem('seatingDataV12', JSON.stringify(seatingData));
             // ដូរពី localStorage ទៅ Firebase
             saveAllDataToFirebase();
             
@@ -1205,9 +1304,8 @@
                 grandTotal += val;
             });
 
-            localStorage.setItem('bookBorrowingDataV12', JSON.stringify(bookBorrowingData));
-            // ដូរពី localStorage ទៅ Firebase
-            saveAllDataToFirebase();
+            // រក្សាទុកដោយស្ងាត់ៗ ពេលកំពុងវាយលេខសៀវភៅ
+            saveAllDataToFirebase(true);
 
             for(let sid in studentTotals) {
                 let el = document.getElementById(`book_total_${sid}`);
@@ -1332,6 +1430,76 @@
             `;
         }
 
+        // --- មុខងារសម្រាប់ប័ណ្ណសរសើរ ---
+        function showCertificateView() {
+            document.getElementById('mainDashboard').style.display = 'none';
+            document.querySelectorAll('.detail-view').forEach(el => el.classList.remove('active'));
+            document.getElementById('certificateDetail').classList.add('active');
+            resetNavButtons();
+            renderCertificates();
+        }
+
+        function renderCertificates() {
+            const periodSelector = document.getElementById('periodSelector');
+            const periodId = periodSelector.value;
+            const periodName = periodSelector.options[periodSelector.selectedIndex].text;
+            let denominator = parseFloat(document.getElementById('avgDenominator').value) || 1;
+            
+            const calcResults = processCalculations(periodId, denominator);
+            
+            let rankedStudents = students.filter(s => {
+                let d = calcResults.data.find(x => x.id === s.id);
+                return d && d.hasScores;
+            });
+
+            rankedStudents.sort((a, b) => {
+                let valA = calcResults.data.find(x => x.id === a.id).avg;
+                let valB = calcResults.data.find(x => x.id === b.id).avg;
+                return valB - valA;
+            });
+
+            let top3 = rankedStudents.slice(0, 3);
+            const container = document.getElementById('certificateContainer');
+            container.innerHTML = '';
+            
+            if (top3.length === 0) {
+                container.innerHTML = '<div class="text-center p-10 font-bold text-gray-500 bg-white dark:bg-gray-800 w-full rounded-xl">មិនមានទិន្នន័យសម្រាប់បង្កើតប័ណ្ណសរសើរទេ</div>';
+                return;
+            }
+
+            const khmerNums = ['១', '២', '៣'];
+
+            top3.forEach((student, index) => {
+                let calcData = calcResults.data.find(d => d.id === student.id);
+                let rankNum = khmerNums[index];
+
+                let certHtml = `
+                <div class="certificate-page relative bg-white border-[12px] border-double border-blue-800 p-8 sm:p-12 w-full shadow-lg overflow-hidden flex flex-col justify-between dark:bg-white dark:border-blue-900 mb-8" style="aspect-ratio: 1.414; max-width: 1050px; color: black !important; page-break-after: always; page-break-inside: avoid;">
+                    <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] opacity-40 z-0 pointer-events-none"></div>
+                    
+                    <div class="relative z-10 text-center font-khmer pt-2 sm:pt-4">
+                        <h2 class="text-2xl sm:text-3xl font-bold text-blue-900 mb-1" style="font-family: 'Moul', serif;">ព្រះរាជាណាចក្រកម្ពុជា</h2>
+                        <h3 class="text-xl sm:text-2xl font-bold text-blue-900 mb-2" style="font-family: 'Moul', serif;">ជាតិ សាសនា ព្រះមហាក្សត្រ</h3>
+                        <div class="flex justify-center mb-4"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Lacy_rule.svg/800px-Lacy_rule.svg.png" class="w-32 sm:w-40 opacity-70" alt="Rule"></div>
+                    </div>
+                    <div class="relative z-10 text-center flex-grow flex flex-col justify-center my-2 sm:my-4">
+                        <h1 class="text-4xl sm:text-5xl font-bold text-red-600 mb-8 sm:mb-10 uppercase tracking-widest" style="font-family: 'Moul', serif;">ប័ណ្ណសរសើរ</h1>
+                        <div class="text-lg sm:text-xl leading-[2.2] sm:leading-[2.5] text-gray-900">
+                            <p class="mb-2">នាយកសាលា <span class="font-bold text-blue-800 border-b-2 border-dotted border-gray-500 px-4">${schoolInfo.schoolName || '...'}</span> សូមសរសើរចំពោះ៖</p>
+                            <h2 class="text-2xl sm:text-3xl font-bold text-blue-900 mb-2 mt-4" style="font-family: 'Moul', serif;">${student.name} <span class="text-base sm:text-lg font-normal text-gray-700 ml-2" style="font-family: 'Kantumruy Pro', sans-serif;">(ភេទ៖ ${student.gender === 'ប្រុស (ប)' ? 'ប្រុស' : 'ស្រី'})</span></h2>
+                            <p class="mb-2 mt-4">សិស្សថ្នាក់ទី <span class="font-bold text-red-600 border-b-2 border-dotted border-gray-500 px-4 text-xl sm:text-2xl">${schoolInfo.className || '...'}</span> ដែលទទួលបានចំណាត់ថ្នាក់ <span class="font-bold text-red-600 border-b-2 border-dotted border-gray-500 px-4 text-xl sm:text-2xl" style="font-family: 'Moul', serif;">លេខ ${rankNum}</span></p>
+                            <p>ប្រចាំ <span class="font-bold text-blue-800 border-b-2 border-dotted border-gray-500 px-4">${periodName}</span> ឆ្នាំសិក្សា <span class="font-bold text-blue-800 border-b-2 border-dotted border-gray-500 px-4">${schoolInfo.academicYear || '...'}</span> ។</p>
+                        </div>
+                    </div>
+                    <div class="relative z-10 flex justify-between items-end mt-4 px-2 sm:px-12 text-base sm:text-lg">
+                        <div class="text-center w-48 sm:w-64"><p class="mb-16 sm:mb-20 font-bold text-blue-900">បានឃើញ និងឯកភាព<br>នាយកសាលា</p><p class="font-bold border-b border-dashed border-gray-500 inline-block w-40 sm:w-48">&nbsp;</p></div>
+                        <div class="text-center w-64 sm:w-80"><p class="mb-2 text-sm sm:text-base text-gray-800">ធ្វើនៅ ${schoolInfo.province || '............'} ថ្ងៃទី.......ខែ.......ឆ្នាំ ២០២.....</p><p class="mb-16 sm:mb-20 font-bold text-blue-900">គ្រូបន្ទុកថ្នាក់</p><p class="font-bold border-b border-dashed border-gray-500 inline-block w-40 sm:w-48">&nbsp;</p></div>
+                    </div>
+                </div>`;
+                container.innerHTML += certHtml;
+            });
+        }
+
         function initSchoolInfo() {
             document.getElementById('info_school').value = schoolInfo.schoolName || '';
             document.getElementById('info_province').value = schoolInfo.province || ''; 
@@ -1351,7 +1519,6 @@
             schoolInfo.title = document.getElementById('info_title').value.trim() || '';
             schoolInfo.className = document.getElementById('info_class').value.trim() || '';
             schoolInfo.academicYear = document.getElementById('info_year').value.trim() || '';
-            localStorage.setItem('schoolInfoV12', JSON.stringify(schoolInfo));
             // ដូរពី localStorage ទៅ Firebase
             saveAllDataToFirebase();
             
@@ -1391,18 +1558,27 @@
             document.getElementById('avgDenominator').value = periodDenominators[initialPeriod] || 18;
         }
 
-        function saveData() { localStorage.setItem('studentDataV12', JSON.stringify(students)); }
         // ៤. អនុគមន៍ថ្មីសម្រាប់រក្សាទុកទិន្នន័យទាំងអស់ទៅកាន់ Firebase ពេលមានការកែប្រែ
-        function saveAllDataToFirebase() {
-            db.collection("schoolApp").doc("mainData").set({
+        function saveAllDataToFirebase(silent = false) {
+            const overlay = document.getElementById('globalSavingOverlay');
+            if (!silent && overlay) {
+                overlay.classList.remove('hidden');
+                overlay.classList.add('flex');
+            }
+            
+            return db.collection("schoolApp").doc("mainData").set({
                 students: students,
                 schoolInfo: schoolInfo,
                 scheduleData: scheduleData,
                 seatingData: seatingData,
                 bookBorrowingData: bookBorrowingData,
                 periodDenominators: periodDenominators
+            }).then(() => {
+                if (!silent && overlay) { overlay.classList.add('hidden'); overlay.classList.remove('flex'); }
             }).catch((error) => {
+                if (!silent && overlay) { overlay.classList.add('hidden'); overlay.classList.remove('flex'); }
                 console.error("Error saving document: ", error);
+                if (!silent) alert("បរាជ័យក្នុងការរក្សាទុកទិន្នន័យ! សូមពិនិត្យមើលអ៊ីនធឺណិតរបស់អ្នក។");
             });
         }
 
@@ -1442,7 +1618,6 @@
 
                     if (importedCount > 0) {
                         students.sort((a, b) => a.name.localeCompare(b.name, 'km'));
-                        saveData(); 
                         saveAllDataToFirebase(); 
                         renderTable();
                         updateDashboardStats();
@@ -1458,6 +1633,50 @@
                 event.target.value = '';
             };
             reader.readAsArrayBuffer(file);
+        }
+
+        // --- មុខងារ Backup ទិន្នន័យ ---
+        function backupData() {
+            const dataToBackup = {
+                students: students,
+                schoolInfo: schoolInfo,
+                scheduleData: scheduleData,
+                seatingData: seatingData,
+                bookBorrowingData: bookBorrowingData,
+                periodDenominators: periodDenominators,
+                backupDate: new Date().toISOString()
+            };
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToBackup, null, 2));
+            const downloadNode = document.createElement('a');
+            downloadNode.setAttribute("href", dataStr);
+            const dateStr = new Date().toISOString().split('T')[0];
+            downloadNode.setAttribute("download", `school_backup_${dateStr}.json`);
+            document.body.appendChild(downloadNode); 
+            downloadNode.click();
+            downloadNode.remove();
+        }
+
+        // --- មុខងារ Restore ទិន្នន័យ ---
+        function restoreData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (!confirm("តើអ្នកពិតជាចង់ទាញបញ្ចូលទិន្នន័យនេះមែនទេ? \n\nចំណាំ៖ ទិន្នន័យចាស់ដែលកំពុងមាននៅលើប្រព័ន្ធ នឹងត្រូវជំនួសដោយទិន្នន័យថ្មីនេះទាំងស្រុង!")) { event.target.value = ''; return; }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (importedData.students && importedData.schoolInfo) {
+                        students = importedData.students; schoolInfo = importedData.schoolInfo;
+                        scheduleData = importedData.scheduleData || {}; seatingData = importedData.seatingData || {};
+                        bookBorrowingData = importedData.bookBorrowingData || {}; periodDenominators = importedData.periodDenominators || {};
+                        saveAllDataToFirebase(); alert("🎉 ទាញបញ្ចូលទិន្នន័យ (Restore) ជោគជ័យ!"); refreshData(); initSchoolInfo();
+                    } else { alert("⚠️ ឯកសារនេះមិនមែនជាទម្រង់ Backup របស់ប្រព័ន្ធយើងទេ។"); }
+                } catch (error) { alert("មានបញ្ហាក្នុងការអានឯកសារ Backup។"); }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
         }
 
         function saveStudentRegistration() {
@@ -1496,7 +1715,6 @@
             }
 
             students.sort((a, b) => a.name.localeCompare(b.name, 'km'));
-            saveData(); 
             saveAllDataToFirebase(); 
             cancelRegister(); 
             updateDashboardStats();
@@ -1567,9 +1785,6 @@
                 
                 deletedHistory.push({ student: JSON.parse(JSON.stringify(studentToRestore)), seating: seatingToRestore });
                 
-                localStorage.setItem('seatingDataV12', JSON.stringify(seatingData));
-
-                saveData(); 
                 saveAllDataToFirebase(); 
                 refreshData();
                 showUndoToast(studentToRestore.name);
@@ -1599,8 +1814,6 @@
                 seatingData[key] = historyItem.seating[key];
             }
             
-            localStorage.setItem('seatingDataV12', JSON.stringify(seatingData));
-            saveData();
             saveAllDataToFirebase();
             refreshData();
             hideUndoToast();
@@ -1632,7 +1845,6 @@
             });
             if(!student.records) student.records = {};
             student.records[periodId] = { scores: scores };
-            saveData(); 
             saveAllDataToFirebase(); 
             updateDashboardStats();
             showDetail('tableDetail');
@@ -2485,12 +2697,109 @@
             XLSX.writeFile(wb, `របាយការណ៍_ប្រចាំឆ្នាំ_${schoolInfo.academicYear}.xlsx`);
         }
 
+        // --- ប្រព័ន្ធ Login (Authentication) ---
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // ពេល Login ជោគជ័យ បិទផ្ទាំង Login ហើយបង្ហាញទិន្នន័យ
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('mainAppContainer').classList.remove('hidden');
+                document.getElementById('mainAppContainer').classList.add('flex');
+                loadDataFromFirebase();
+            } else {
+                // ពេលមិនទាន់ Login ឬ ចុច Logout
+                document.getElementById('loginScreen').classList.remove('hidden');
+                document.getElementById('mainAppContainer').classList.add('hidden');
+                document.getElementById('mainAppContainer').classList.remove('flex');
+            }
+        });
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const pass = document.getElementById('loginPassword').value;
+            const btnText = document.getElementById('loginBtnText');
+            const spinner = document.getElementById('loginSpinner');
+            const errDiv = document.getElementById('loginError');
+
+            btnText.innerText = "កំពុងផ្ទៀងផ្ទាត់...";
+            spinner.classList.remove('hidden');
+            errDiv.className = "text-red-200 text-sm font-bold text-center bg-red-900/50 border border-red-500/50 p-3 rounded-xl backdrop-blur-md hidden";
+            errDiv.classList.add('hidden');
+
+            auth.signInWithEmailAndPassword(email, pass).catch((error) => {
+                btnText.innerText = "ចូលប្រព័ន្ធ";
+                spinner.classList.add('hidden');
+                errDiv.innerText = "អ៊ីមែល ឬ ពាក្យសម្ងាត់មិនត្រឹមត្រូវទេ!";
+                errDiv.classList.remove('hidden');
+            });
+        }
+
+        function handleForgotPassword(e) {
+            if(e) e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const errDiv = document.getElementById('loginError');
+            
+            if(!email) {
+                errDiv.className = "text-yellow-200 text-sm font-bold text-center bg-yellow-900/50 border border-yellow-500/50 p-3 rounded-xl backdrop-blur-md";
+                errDiv.innerText = "សូមបញ្ចូលអ៊ីមែល (Email) របស់អ្នកនៅខាងលើជាមុនសិន រួចចុច 'ភ្លេចពាក្យសម្ងាត់?' ម្តងទៀត!";
+                errDiv.classList.remove('hidden');
+                return;
+            }
+            
+            auth.sendPasswordResetEmail(email).then(() => {
+                errDiv.className = "text-green-200 text-sm font-bold text-center bg-green-900/50 border border-green-500/50 p-3 rounded-xl backdrop-blur-md";
+                errDiv.innerText = "ជោគជ័យ! តំណភ្ជាប់ (Link) សម្រាប់ប្តូរពាក្យសម្ងាត់ត្រូវបានផ្ញើទៅកាន់អ៊ីមែលរបស់អ្នកហើយ។ សូមពិនិត្យមើលក្នុងប្រអប់សារ (Inbox ឬ Spam)។";
+                errDiv.classList.remove('hidden');
+            }).catch((error) => {
+                errDiv.className = "text-red-200 text-sm font-bold text-center bg-red-900/50 border border-red-500/50 p-3 rounded-xl backdrop-blur-md";
+                if (error.code === 'auth/user-not-found') errDiv.innerText = "រកមិនឃើញគណនីអ៊ីមែលនេះក្នុងប្រព័ន្ធទេ។";
+                else if (error.code === 'auth/invalid-email') errDiv.innerText = "ទម្រង់អ៊ីមែលមិនត្រឹមត្រូវទេ។";
+                else errDiv.innerText = "មានបញ្ហា: " + error.message;
+                errDiv.classList.remove('hidden');
+            });
+        }
+
+        function handleLogout() {
+            if(confirm('តើអ្នកពិតជាចង់ចាកចេញពីប្រព័ន្ធមែនទេ?')) {
+                auth.signOut();
+            }
+        }
+
+        // --- មុខងារប្តូរពាក្យសម្ងាត់ ---
+        function openChangePasswordModal() {
+            document.getElementById('changePasswordModal').classList.remove('hidden');
+            document.getElementById('newPasswordInput').value = '';
+            document.getElementById('cpwError').classList.add('hidden');
+            document.getElementById('btnSubmitCPW').innerText = 'រក្សាទុក';
+            document.getElementById('btnSubmitCPW').disabled = false;
+        }
+        function closeChangePasswordModal() { document.getElementById('changePasswordModal').classList.add('hidden'); }
+        function submitChangePassword() {
+            const newPassword = document.getElementById('newPasswordInput').value;
+            const errDiv = document.getElementById('cpwError');
+            const btn = document.getElementById('btnSubmitCPW');
+
+            if(newPassword.length < 6) {
+                errDiv.innerText = "ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច ៦ ខ្ទង់!";
+                errDiv.classList.remove('hidden'); return;
+            }
+
+            btn.innerText = "កំពុងប្តូរ..."; btn.disabled = true;
+            const user = auth.currentUser;
+            if(user) {
+                user.updatePassword(newPassword).then(() => {
+                    alert('ជោគជ័យ! ប្តូរពាក្យសម្ងាត់រួចរាល់។ សូម Login ម្តងទៀតដោយប្រើពាក្យសម្ងាត់ថ្មី។');
+                    closeChangePasswordModal(); auth.signOut();
+                }).catch((error) => {
+                    let msg = "មានបញ្ហា! សូមព្យាយាមម្តងទៀត។";
+                    if(error.code === 'auth/requires-recent-login') msg = "សុវត្ថិភាព! សូម Logout រួច Login ចូលវិញ មុននឹងប្តូរពាក្យសម្ងាត់ថ្មី។";
+                    errDiv.innerText = msg; errDiv.classList.remove('hidden');
+                    btn.innerText = "រក្សាទុក"; btn.disabled = false;
+                });
+            }
+        }
+
         // Initialization
-        buildUI();
-        showDashboard();
-        updateDashboardStats();
-        // ទាញទិន្នន័យពី Firebase មុននឹងបង្ហាញកូដ
-        loadDataFromFirebase();
     </script>
 </body>
 </html>
