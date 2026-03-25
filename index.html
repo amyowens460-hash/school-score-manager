@@ -1,0 +1,2496 @@
+<!DOCTYPE html>
+<html lang="km" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ប្រព័ន្ធគ្រប់គ្រងពិន្ទុសិស្ស v18.2 - Perfect Print & Signature</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class', theme: { extend: {} } }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- បន្ថែម Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <style>
+        body { font-family: 'Kantumruy Pro', sans-serif; transition: background-color 0.3s, color 0.3s; display: flex; flex-direction: column; min-height: 100vh; }
+        .vertical-text { writing-mode: vertical-rl; text-orientation: mixed; height: 130px; padding: 10px 4px; text-align: left; display: flex; align-items: center; }
+        table { border-collapse: separate; border-spacing: 0; }
+        th, td { border-bottom: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; }
+        .dark th, .dark td { border-color: #374151; }
+        th:first-child, td:first-child { border-left: 1px solid #e5e7eb; }
+        .dark th:first-child, .dark td:first-child { border-left-color: #374151; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        ::-webkit-scrollbar { height: 8px; width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+        .dark ::-webkit-scrollbar-thumb { background-color: #4b5563; }
+        
+        .dashboard-card { transition: all 0.3s ease; animation: fadeIn 0.3s ease-in-out; }
+        .detail-view { display: none; animation: fadeIn 0.3s ease-in-out; flex-grow: 1; }
+        .detail-view.active { display: block; }
+        
+        /* ================= RGB GLOW EFFECT ================= */
+        @keyframes rgb-bg {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .rgb-wrapper {
+            border-radius: 1.35rem;
+            padding: 3px;
+            background: linear-gradient(90deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3, #ff0000);
+            background-size: 400% 400%;
+            animation: rgb-bg 5s linear infinite;
+            box-shadow: 0 10px 20px -5px rgba(0,0,0,0.15);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .rgb-wrapper:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 15px 25px -5px rgba(0,0,0,0.3);
+        }
+        .rgb-inner {
+            border-radius: 1.2rem;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .dark .rgb-inner { border: none !important; }
+
+        .tab-btn { transition: all 0.2s; }
+        .tab-btn.active { background-color: #4f46e5; color: white; border-color: #4f46e5; }
+        .dark .tab-btn.active { background-color: #6366f1; border-color: #6366f1; }
+        .tab-content { display: none; animation: fadeIn 0.3s ease-in-out; }
+        .tab-content.active { display: block; }
+        .schedule-cell:focus { background-color: #eff6ff; outline: 2px solid #3b82f6; border-radius: 4px; }
+        .dark .schedule-cell:focus { background-color: #374151; outline-color: #60a5fa; }
+        
+        .book-cell:focus { background-color: #fef08a !important; outline: 2px solid #eab308; }
+
+        /* ================= SMART PRINT STYLES FOR A4 ================= */
+        .print-header { text-align: center; margin-bottom: 15px; padding-bottom: 5px; display: none; }
+        .print-footer { display: none; }
+        
+        @media print {
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            
+            body { background-color: white !important; color: black !important; padding: 0 !important; font-size: 11pt !important; display: block !important; }
+            .dark { background-color: white !important; color: black !important; }
+            
+            .no-print, nav, button, .shadow-lg, .shadow-md, .shadow-sm, #dev-signature-screen { display: none !important; box-shadow: none !important; }
+            .action-col { display: none !important; } 
+            
+            .print-area { width: 100% !important; margin: 0 !important; padding: 0 !important; border: none !important; max-width: none !important; }
+            .detail-view { display: block !important; border: none !important; padding: 0 !important; margin: 0 !important; }
+            .detail-view:not(.active) { display: none !important; }
+            .dashboard-card, #mainDashboard { display: none !important; }
+            
+            /* Print Header Formatting */
+            .print-header, .print-header-active { display: block !important; border-bottom: 2px solid #333 !important; margin-bottom: 15px !important; padding-bottom: 10px !important; text-align: center; }
+            .print-header h2 { font-size: 18pt !important; font-weight: bold; margin-bottom: 5px !important; }
+            .print-header h3 { font-size: 14pt !important; margin-bottom: 5px !important; color: #000 !important; }
+            .print-header div { font-size: 11pt !important; color: #333 !important; }
+            
+            table { page-break-inside: auto !important; width: 100% !important; border-collapse: collapse !important; margin-bottom: 15px !important;}
+            thead { display: table-header-group !important; } 
+            tr { page-break-inside: avoid !important; page-break-after: auto !important; }
+            td, th { border: 1px solid #000 !important; color: black !important; background-color: transparent !important; } 
+            
+            /* -- Perfect Ranking Table for A4 Portrait -- */
+            .rank-table-print { table-layout: fixed !important; width: 100% !important; }
+            .rank-table-print th, .rank-table-print td { font-size: 9pt !important; padding: 4px 2px !important; word-wrap: break-word !important; overflow-wrap: break-word !important; white-space: normal !important; }
+            
+            /* -- Perfect Score Table for Landscape -- */
+            .score-table-print { width: 100% !important; }
+            .score-table-print th, .score-table-print td { font-size: 9pt !important; padding: 4px 2px !important; word-wrap: break-word !important; white-space: normal !important; text-align: center; }
+            
+            /* -- Perfect Book Borrowing Table for Landscape -- */
+            .book-borrow-table { table-layout: fixed !important; width: 100% !important; }
+            .book-borrow-table th, .book-borrow-table td { padding: 1px !important; font-size: 8pt !important; border-color: #1e3a8a !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .book-borrow-table .vertical-text { height: 75px !important; font-size: 7.5pt !important; padding: 0 !important; }
+            .book-cell { min-height: 14px !important; font-size: 8pt !important; }
+            
+            .vertical-text { writing-mode: vertical-rl !important; text-orientation: mixed !important; height: 100px !important; font-size: 8.5pt !important; padding: 2px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+            .admin-student-table { table-layout: fixed !important; width: 100% !important;}
+            .admin-student-table td, .admin-student-table th { padding: 4px 5px !important; font-size: 10pt !important; line-height: 1.3 !important; word-wrap: break-word !important;}
+            .sticky { position: static !important; }
+            .overflow-x-auto { overflow: visible !important; height: auto !important; max-height: none !important; display: table !important; width: 100% !important;}
+            .text-white, .text-gray-100, .text-gray-200, .text-blue-100, .text-blue-900, .text-blue-800, .text-red-600 { color: black !important; }
+            .bg-blue-50, .bg-blue-100, .bg-gray-100, .bg-gray-200, .bg-yellow-50, .bg-yellow-100, .bg-amber-50, .bg-indigo-100 { background-color: transparent !important; }
+            .tab-content:not(.active) { display: none !important; }
+            .seating-select { appearance: none !important; border: none !important; background: transparent !important; text-align: center; font-weight: bold; padding: 0 !important; font-size: 10pt !important;}
+            .print-footer { display: block !important; text-align: right; font-size: 9pt; margin-top: 15px; font-style: italic; color: #555 !important; }
+        }
+    </style>
+</head>
+<body class="p-2 sm:p-4 md:p-6 bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+
+    <div class="max-w-[1500px] mx-auto space-y-4 print-area flex-grow w-full">
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 no-print">
+            <div class="text-center sm:text-left">
+                <h1 class="text-2xl sm:text-3xl font-bold text-blue-700 dark:text-blue-400 mb-1">ប្រព័ន្ធគ្រប់គ្រងពិន្ទុសិស្ស v18.2</h1>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Classroom Management System</p>
+            </div>
+            <button onclick="toggleTheme()" class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                <span id="themeIcon" class="text-xl">🌙</span>
+                <span id="themeText" class="font-bold text-sm">Dark Mode</span>
+            </button>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col xl:flex-row justify-between items-center gap-4 no-print">
+            <div class="flex w-full xl:w-auto gap-2 overflow-x-auto pb-2 xl:pb-0 scrollbar-hide">
+                <button onclick="showDashboard()" id="btn_dashboard" class="flex-1 sm:flex-none px-4 sm:px-6 py-2.5 font-bold text-sm rounded-lg bg-blue-600 text-white shadow-md transition whitespace-nowrap">ទំព័រដើម</button>
+                <button onclick="showDetail('tableDetail')" id="btn_table" class="flex-1 sm:flex-none px-4 sm:px-6 py-2.5 font-bold text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition whitespace-nowrap">តារាងពិន្ទុ</button>
+                <button onclick="showDetail('rankDetail')" id="btn_rank" class="flex-1 sm:flex-none px-4 sm:px-6 py-2.5 font-bold text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition whitespace-nowrap">ចំណាត់ថ្នាក់</button>
+                <button onclick="showDetail('classAdminDetail')" id="btn_admin" class="flex-1 sm:flex-none px-4 sm:px-6 py-2.5 font-bold text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition whitespace-nowrap">រដ្ឋបាលថ្នាក់</button>
+                <button onclick="showDetail('reportDetail')" id="btn_report" class="flex-1 sm:flex-none px-4 sm:px-6 py-2.5 font-bold text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition whitespace-nowrap">របាយការណ៍</button>
+                <button onclick="showDetail('registerDetail')" id="btn_register" class="flex-1 sm:flex-none px-4 sm:px-6 py-2.5 font-bold text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition whitespace-nowrap">កំណត់ប្រព័ន្ធ</button>
+            </div>
+            
+            <div class="flex flex-wrap sm:flex-nowrap items-center gap-3 bg-blue-50 dark:bg-gray-700 p-2.5 rounded-lg border border-blue-100 dark:border-gray-600 w-full xl:w-auto justify-center">
+                <div class="flex items-center gap-2">
+                    <label class="font-bold text-blue-800 dark:text-blue-300 text-sm whitespace-nowrap">ជ្រើសរើសពេល៖</label>
+                    <select id="periodSelector" onchange="handlePeriodChange()" class="p-2 border border-blue-300 dark:border-gray-500 rounded-md bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 outline-none text-blue-900 dark:text-blue-100 font-bold text-sm cursor-pointer">
+                        <option value="nov">ខែវិច្ឆិកា</option><option value="dec">ខែធ្នូ</option><option value="jan">ខែមករា</option><option value="feb">ខែកុម្ភៈ</option><option value="mar">ខែមីនា</option>
+                        <option value="sem1" class="bg-blue-100 dark:bg-blue-900">ប្រឡងឆមាសទី១</option>
+                        <option value="apr">ខែមេសា</option><option value="may">ខែឧសភា</option><option value="jun">ខែមិថុនា</option><option value="jul">ខែកក្កដា</option><option value="aug">ខែសីហា</option><option value="sep">ខែកញ្ញា</option>
+                        <option value="sem2" class="bg-blue-100 dark:bg-blue-900">ប្រឡងឆមាសទី២</option>
+                    </select>
+                </div>
+                <div class="h-6 w-px bg-blue-200 dark:bg-gray-500 hidden sm:block"></div>
+                <div class="flex items-center gap-2">
+                    <label class="font-bold text-red-700 dark:text-red-400 text-sm whitespace-nowrap">មេគុណចែក៖</label>
+                    <input type="number" id="avgDenominator" oninput="handleDenominatorChange()" class="w-16 p-2 border border-red-300 dark:border-red-500 rounded-md bg-white dark:bg-gray-800 outline-none text-center font-bold text-red-700 dark:text-red-400 focus:ring-2 focus:ring-red-400 text-sm">
+                </div>
+            </div>
+        </div>
+
+        <div id="mainDashboard" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 dashboard-card p-4">
+            <div onclick="showDetail('tableDetail')" class="rgb-wrapper">
+                <div class="rgb-inner bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 p-6 border border-blue-200 dark:border-gray-700">
+                    <div class="flex items-center justify-between mb-4"><div class="p-3 bg-blue-600 rounded-xl shadow-md"><svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></div><span class="text-4xl font-bold text-blue-600 dark:text-blue-400" id="dashboardStudentCount">0</span></div>
+                    <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">តារាងបញ្ជីពិន្ទុ</h3><p class="text-gray-600 dark:text-gray-400 text-sm flex-grow">បង្ហាញតារាងពិន្ទុលម្អិតរបស់សិស្ស រួមទាំងពិន្ទុមុខវិជ្ជានីមួយៗ</p>
+                </div>
+            </div>
+
+            <div onclick="showDetail('rankDetail')" class="rgb-wrapper">
+                <div class="rgb-inner bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-gray-800 dark:to-gray-900 p-6 border border-yellow-200 dark:border-gray-700">
+                    <div class="flex items-center justify-between mb-4"><div class="p-3 bg-yellow-600 rounded-xl shadow-md"><svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg></div><span class="text-4xl font-bold text-yellow-600 dark:text-yellow-400" id="dashboardPassRate">0%</span></div>
+                    <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">តារាងចំណាត់ថ្នាក់ & ស្ថិតិ</h3><p class="text-gray-600 dark:text-gray-400 text-sm flex-grow">បង្ហាញចំណាត់ថ្នាក់សិស្សជា ២ ជួរ ងាយស្រួលព្រីនជា A4</p>
+                </div>
+            </div>
+
+            <div onclick="showDetail('classAdminDetail')" class="rgb-wrapper">
+                <div class="rgb-inner bg-gradient-to-br from-purple-50 to-fuchsia-50 dark:from-gray-800 dark:to-gray-900 p-6 border border-purple-200 dark:border-gray-700">
+                    <div class="flex items-center justify-between mb-4"><div class="p-3 bg-purple-600 rounded-xl shadow-md"><svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg></div><span class="text-2xl font-bold text-purple-700 dark:text-purple-400">រដ្ឋបាល</span></div>
+                    <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">រដ្ឋបាលថ្នាក់រៀន</h3><p class="text-gray-600 dark:text-gray-400 text-sm flex-grow">បញ្ជីឈ្មោះសិស្ស, វេណសម្អាត, កាលវិភាគ, ប្លង់តុ, បញ្ជីខ្ចីសៀវភៅ</p>
+                </div>
+            </div>
+
+            <div onclick="showHonorRoll()" class="rgb-wrapper md:col-span-2 lg:col-span-1">
+                <div class="rgb-inner bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-gray-800 dark:to-gray-900 p-6 border border-yellow-200 dark:border-gray-700">
+                    <div class="flex items-center justify-between mb-4"><div class="p-3 bg-gradient-to-r from-yellow-600 to-amber-600 rounded-xl shadow-md"><svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"></path></svg></div><span class="text-2xl font-bold text-amber-700 dark:text-amber-400">កិត្តិយស</span></div>
+                    <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">តារាងកិត្តិយស</h3><p class="text-gray-600 dark:text-gray-400 text-sm mb-3">បង្ហាញសិស្សឆ្នើមទាំង ៥ នាក់ដំបូងជាទម្រង់ប្លង់ដ៏ស្រស់ស្អាត។</p>
+                </div>
+            </div>
+            
+            <div onclick="showDetail('reportDetail')" class="rgb-wrapper md:col-span-2 lg:col-span-1">
+                <div class="rgb-inner bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-gray-800 dark:to-gray-900 p-6 border border-cyan-200 dark:border-gray-700">
+                    <div class="flex items-center justify-between mb-4"><div class="p-3 bg-cyan-600 rounded-xl shadow-md"><svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></div><span class="text-2xl font-bold text-cyan-700 dark:text-cyan-400">របាយការណ៍</span></div>
+                    <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">របាយការណ៍លទ្ធផល</h3><p class="text-gray-600 dark:text-gray-400 text-sm flex-grow">ទាញយកររបាយការណ៍សរុបប្រចាំខែ ឆមាស និងប្រចាំឆ្នាំ</p>
+                </div>
+            </div>
+
+            <div onclick="showDetail('registerDetail')" class="rgb-wrapper">
+                <div class="rgb-inner bg-gradient-to-br from-green-50 to-emerald-50 dark:from-gray-800 dark:to-gray-900 p-6 border border-green-200 dark:border-gray-700">
+                    <div class="flex items-center justify-between mb-4"><div class="p-3 bg-green-600 rounded-xl shadow-md"><svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg></div><span class="text-2xl font-bold text-green-600 dark:text-green-400" id="dashboardRegisterCount">0</span></div>
+                    <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">កំណត់ប្រព័ន្ធ & ចុះឈ្មោះ</h3><p class="text-gray-600 dark:text-gray-400 text-sm flex-grow">កំណត់ឈ្មោះសាលា ថ្នាក់ទី និងចុះឈ្មោះសិស្ស</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="classAdminDetail" class="detail-view bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden relative p-2 sm:p-4 print-area max-w-[1400px] mx-auto">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 no-print gap-4">
+                <button onclick="showDashboard()" class="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition whitespace-nowrap">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>ត្រឡប់ទៅទំព័រដើម
+                </button>
+                <div class="flex gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
+                    <button onclick="switchAdminTab('tab_studentList')" id="btn_tab_studentList" class="tab-btn active px-4 py-2 text-sm font-bold rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 whitespace-nowrap">បញ្ជីឈ្មោះ</button>
+                    <button onclick="switchAdminTab('tab_cleaning')" id="btn_tab_cleaning" class="tab-btn px-4 py-2 text-sm font-bold rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 whitespace-nowrap">វេណសម្អាត</button>
+                    <button onclick="switchAdminTab('tab_schedule')" id="btn_tab_schedule" class="tab-btn px-4 py-2 text-sm font-bold rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 whitespace-nowrap">កាលវិភាគ</button>
+                    <button onclick="switchAdminTab('tab_seating')" id="btn_tab_seating" class="tab-btn px-4 py-2 text-sm font-bold rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 whitespace-nowrap">ប្លង់តុ</button>
+                    <button onclick="switchAdminTab('tab_inventory')" id="btn_tab_inventory" class="tab-btn px-4 py-2 text-sm font-bold rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 whitespace-nowrap">សារពើភណ្ឌ</button>
+                    <button onclick="switchAdminTab('tab_book_borrowing')" id="btn_tab_book_borrowing" class="tab-btn px-4 py-2 text-sm font-bold rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 whitespace-nowrap">ខ្ចីសៀវភៅ</button>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="printPortrait()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2.5 px-4 rounded-lg shadow-sm transition flex items-center gap-1.5 whitespace-nowrap">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>បញ្ឈរ
+                    </button>
+                    <button onclick="printLandscape()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 px-4 rounded-lg shadow-sm transition flex items-center gap-1.5 whitespace-nowrap">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>ផ្ដេក
+                    </button>
+                </div>
+            </div>
+
+            <div id="defaultAdminPrintHeader" class="print-header">
+                <h2 class="displaySchoolName">...</h2>
+                <h3 id="adminPrintTitle">បញ្ជីរដ្ឋបាល</h3>
+                <div>
+                    <span>ថ្នាក់ទី៖ <span class="displayClass font-bold">...</span></span> | <span>ឆ្នាំសិក្សា៖ <span class="displayYear font-bold">...</span></span>
+                </div>
+            </div>
+
+            <div id="reportStylePrintHeader" class="hidden mb-6 font-khmer text-blue-900 dark:text-blue-100" style="-webkit-print-color-adjust: exact;">
+                <div class="text-center mb-6">
+                    <h2 class="text-xl font-bold uppercase text-blue-800 dark:text-blue-300">ព្រះរាជាណាចក្រកម្ពុជា</h2>
+                    <h3 class="text-lg font-bold text-blue-800 dark:text-blue-300 mb-2">ជាតិ សាសនា ព្រះមហាក្សត្រ</h3>
+                    <div class="flex justify-center"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Lacy_rule.svg/800px-Lacy_rule.svg.png" class="w-32 h-auto opacity-50 dark:invert" alt="Rule"></div>
+                </div>
+                
+                <div class="flex justify-between items-end mb-6">
+                    <div class="font-bold text-blue-800 dark:text-blue-300 text-left">
+                        មន្ទីរអប់រំយុវជន និងកីឡា ខេត្ត<span class="displayProvince">............</span><br>
+                        <span class="displaySchoolName text-lg">...</span>
+                    </div>
+                    <div class="text-center">
+                        <h1 class="text-2xl font-bold text-red-600 dark:text-red-400 mb-1">បញ្ជីឈ្មោះសិស្សខ្ចីសៀវភៅពុម្ព</h1>
+                        <h3 class="text-lg font-bold text-blue-800 dark:text-blue-300">ថ្នាក់ទី <span class="displayClass">...</span> ឆ្នាំសិក្សា <span class="displayYear">...</span></h3>
+                    </div>
+                    <div class="w-48 text-right font-bold text-blue-800 dark:text-blue-300 text-sm"></div>
+                </div>
+            </div>
+
+            <div id="tab_studentList" class="tab-content active">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-3 no-print">📋 បញ្ជីឈ្មោះសិស្សប្រចាំថ្នាក់</h3>
+                <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    <table class="w-full text-left text-sm admin-student-table border-collapse">
+                        <colgroup>
+                            <col width="5%">
+                            <col width="30%">
+                            <col width="8%">
+                            <col width="17%">
+                            <col width="40%">
+                        </colgroup>
+                        <thead class="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                            <tr>
+                                <th class="px-3 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ល.រ</th>
+                                <th class="px-4 py-2 font-bold border border-gray-300 dark:border-gray-600">គោត្តនាម និងនាម</th>
+                                <th class="px-3 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ភេទ</th>
+                                <th class="px-4 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ថ្ងៃខែឆ្នាំកំណើត</th>
+                                <th class="px-4 py-2 font-bold border border-gray-300 dark:border-gray-600">ព័ត៌មានផ្សេងៗ (ឪពុកម្ដាយ ទំនាក់ទំនង ស្ថានភាព)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminStudentListBody" class="bg-white dark:bg-gray-800"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab_cleaning" class="tab-content">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-3 no-print">🧹 បញ្ជីវេណសម្អាតថ្នាក់រៀន (រៀបចំស្វ័យប្រវត្តិ)</h3>
+                <p class="text-sm text-gray-500 mb-4 no-print">* ការបែងចែកនេះលាយសិស្សប្រុស និងស្រីបញ្ជូលគ្នា រួចរៀបចំដាក់តាមថ្ងៃនីមួយៗស្មើៗគ្នា។</p>
+                <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    <table class="w-full text-center text-sm border-collapse">
+                        <thead class="bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200">
+                            <tr><th class="px-4 py-3 font-bold border border-gray-300 dark:border-gray-600 w-1/6">ថ្ងៃច័ន្ទ</th><th class="px-4 py-3 font-bold border border-gray-300 dark:border-gray-600 w-1/6">ថ្ងៃអង្គារ</th><th class="px-4 py-3 font-bold border border-gray-300 dark:border-gray-600 w-1/6">ថ្ងៃពុធ</th><th class="px-4 py-3 font-bold border border-gray-300 dark:border-gray-600 w-1/6">ថ្ងៃព្រហស្បតិ៍</th><th class="px-4 py-3 font-bold border border-gray-300 dark:border-gray-600 w-1/6">ថ្ងៃសុក្រ</th><th class="px-4 py-3 font-bold border border-gray-300 dark:border-gray-600 w-1/6">ថ្ងៃសៅរ៍</th></tr>
+                        </thead>
+                        <tbody id="cleaningScheduleBody" class="bg-white dark:bg-gray-800"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab_schedule" class="tab-content">
+                <div class="flex justify-between items-center mb-3 no-print">
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200">📅 កាលវិភាគសិក្សា</h3>
+                    <button onclick="saveSchedule()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded shadow transition flex items-center gap-1">✓ រក្សាទុកកាលវិភាគ</button>
+                </div>
+                <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    <table class="w-full text-center text-sm border-collapse">
+                        <thead class="bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200">
+                            <tr><th class="px-3 py-3 font-bold border border-gray-300 dark:border-gray-600 w-32">ម៉ោងសិក្សា</th><th class="px-4 py-3 font-bold border border-gray-300 dark:border-gray-600">ថ្ងៃច័ន្ទ</th><th class="px-4 py-3 font-bold border border-gray-300 dark:border-gray-600">ថ្ងៃអង្គារ</th><th class="px-4 py-3 font-bold border border-gray-300 dark:border-gray-600">ថ្ងៃពុធ</th><th class="px-4 py-3 font-bold border border-gray-300 dark:border-gray-600">ថ្ងៃព្រហស្បតិ៍</th><th class="px-4 py-3 font-bold border border-gray-300 dark:border-gray-600">ថ្ងៃសុក្រ</th><th class="px-4 py-3 font-bold border border-gray-300 dark:border-gray-600">ថ្ងៃសៅរ៍</th></tr>
+                        </thead>
+                        <tbody class="bg-white dark:bg-gray-800 align-middle">
+                            <tr>
+                                <td class="px-3 py-3 font-bold bg-blue-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600">៧:០០ - ៨:០០</td>
+                                <td contenteditable="true" id="sch_m1_1" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m1_2" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m1_3" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m1_4" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m1_5" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m1_6" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td>
+                            </tr>
+                            <tr>
+                                <td class="px-3 py-3 font-bold bg-blue-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600">៨:០០ - ៩:០០</td>
+                                <td contenteditable="true" id="sch_m2_1" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m2_2" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m2_3" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m2_4" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m2_5" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m2_6" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td>
+                            </tr>
+                            <tr>
+                                <td class="px-3 py-3 font-bold bg-blue-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600">៩:០០ - ១០:០០</td>
+                                <td contenteditable="true" id="sch_m3_1" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m3_2" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m3_3" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m3_4" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m3_5" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m3_6" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td>
+                            </tr>
+                            <tr>
+                                <td class="px-3 py-3 font-bold bg-blue-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600">១០:០០ - ១១:០០</td>
+                                <td contenteditable="true" id="sch_m4_1" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m4_2" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m4_3" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m4_4" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m4_5" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_m4_6" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td>
+                            </tr>
+                            
+                            <tr class="bg-gray-100 dark:bg-gray-700/50">
+                                <td colspan="7" class="px-3 py-2 text-center font-bold text-gray-500 tracking-widest border border-gray-300 dark:border-gray-600">សម្រាកថ្ងៃត្រង់ (១១:០០ - ២:០០)</td>
+                            </tr>
+                            
+                            <tr>
+                                <td class="px-3 py-3 font-bold bg-amber-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600">២:០០ - ៣:០០</td>
+                                <td contenteditable="true" id="sch_a1_1" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_a1_2" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_a1_3" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_a1_4" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_a1_5" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_a1_6" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td>
+                            </tr>
+                            <tr>
+                                <td class="px-3 py-3 font-bold bg-amber-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600">៣:០០ - ៤:០០</td>
+                                <td contenteditable="true" id="sch_a2_1" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_a2_2" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_a2_3" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_a2_4" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_a2_5" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_a2_6" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td>
+                            </tr>
+                            <tr>
+                                <td class="px-3 py-3 font-bold bg-amber-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600">៤:០០ - ៥:០០</td>
+                                <td contenteditable="true" id="sch_a3_1" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_a3_2" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_a3_3" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_a3_4" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_a3_5" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td><td contenteditable="true" id="sch_a3_6" class="schedule-cell px-2 py-3 border border-gray-300 dark:border-gray-600"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab_seating" class="tab-content">
+                <div class="flex justify-between items-center mb-3 no-print">
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200">🪑 ប្លង់តុអង្គុយរបស់សិស្ស</h3>
+                    <button onclick="saveSeatingPlan()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded shadow transition flex items-center gap-1">✓ រក្សាទុកប្លង់តុ</button>
+                </div>
+                <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 p-4 sm:p-6 rounded-xl bg-gray-50 dark:bg-gray-800/50 min-h-[500px] flex flex-col items-center">
+                    <div class="w-48 h-12 sm:h-16 bg-blue-100 dark:bg-blue-900 border-2 border-blue-400 dark:border-blue-600 rounded flex items-center justify-center font-bold text-blue-800 dark:text-blue-200 mb-8 sm:mb-12 shadow-sm">តុគ្រូបង្រៀន</div>
+                    <div id="seatingGrid" class="grid grid-cols-2 md:grid-cols-4 gap-x-4 sm:gap-x-6 gap-y-8 sm:gap-y-10 w-full max-w-5xl"></div>
+                </div>
+            </div>
+
+            <div id="tab_inventory" class="tab-content">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-3 no-print">📦 បញ្ជីសារពើភណ្ឌក្នុងថ្នាក់រៀន</h3>
+                <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    <table class="w-full text-left text-sm border-collapse">
+                        <thead class="bg-teal-100 dark:bg-teal-900/40 text-teal-800 dark:text-teal-200">
+                            <tr><th class="px-3 py-3 text-center font-bold border border-gray-300 dark:border-gray-600 w-16">ល.រ</th><th class="px-4 py-3 font-bold border border-gray-300 dark:border-gray-600">ឈ្មោះសម្ភារៈ (ទ្រព្យសម្បត្តិ)</th><th class="px-3 py-3 text-center font-bold border border-gray-300 dark:border-gray-600 w-24">ឯកតា</th><th class="px-3 py-3 text-center font-bold border border-gray-300 dark:border-gray-600 w-24">ចំនួន</th><th class="px-4 py-3 text-center font-bold border border-gray-300 dark:border-gray-600">ស្ថានភាព (ល្អ/ខូច)</th><th class="px-4 py-3 font-bold border border-gray-300 dark:border-gray-600 w-48">កំណត់សម្គាល់</th></tr>
+                        </thead>
+                        <tbody class="bg-white dark:bg-gray-800">
+                            <script>
+                                for(let i=1; i<=15; i++) {
+                                    document.write(`<tr><td class="px-3 py-3 text-center text-gray-500 border border-gray-300 dark:border-gray-600">${i}</td><td class="px-4 py-3 border border-gray-300 dark:border-gray-600"></td><td class="px-3 py-3 border border-gray-300 dark:border-gray-600"></td><td class="px-3 py-3 border border-gray-300 dark:border-gray-600"></td><td class="px-4 py-3 border border-gray-300 dark:border-gray-600"></td><td class="px-4 py-3 border border-gray-300 dark:border-gray-600"></td></tr>`);
+                                }
+                            </script>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab_book_borrowing" class="tab-content">
+                <h3 class="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2 no-print">📚 បញ្ជីឈ្មោះសិស្សខ្ចីសៀវភៅ</h3>
+                <p class="text-[11px] text-gray-500 mb-4 no-print">💡 <b>គន្លឹះ៖</b> ចុចលើប្រអប់ក្នុងតារាងដើម្បីវាយបញ្ចូលចំនួនសៀវភៅ (វានឹងគណនាសរុបដោយស្វ័យប្រវត្តិ)។ តារាងនេះត្រូវបានរចនាដើម្បីឱ្យព្រីនត្រូវខ្នាត A4 ផ្ដេក។</p>
+                <div class="overflow-x-auto rounded-lg">
+                    <table class="book-borrow-table border-collapse border-2 border-blue-900 dark:border-blue-400 text-sm font-khmer text-blue-900 dark:text-blue-100 mx-auto" style="-webkit-print-color-adjust: exact;">
+                        <thead class="bg-blue-50 dark:bg-gray-800">
+                            <tr id="borrowingHeaderRow1">
+                                </tr>
+                            <tr id="borrowingHeaderRow2">
+                                </tr>
+                        </thead>
+                        <tbody id="borrowingTableBody">
+                            </tbody>
+                        <tfoot id="borrowingTableFooter" class="bg-blue-50 dark:bg-gray-800 font-bold">
+                            </tfoot>
+                    </table>
+                    
+                    <div id="borrowingSummary" class="mt-4 p-2 text-sm font-bold text-blue-900 dark:text-blue-100 border border-blue-900 dark:border-blue-400 border-t-0">
+                        </div>
+                </div>
+            </div>
+
+            <div class="print-footer default-print-footer">
+                បង្កើតកម្មវិធីដោយ <b>HENG ROTHIVONG</b> | Telegram: t.me/Hengrothivong
+            </div>
+        </div>
+
+        <div id="honorRollDetail" class="detail-view bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden p-6 print-area max-w-4xl mx-auto">
+            <div class="flex items-center justify-between mb-6 no-print">
+                <button onclick="showDashboard()" class="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>ត្រឡប់ទៅទំព័រដើម</button>
+                <button onclick="printPortrait()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>ព្រីន (Portrait)</button>
+            </div>
+            <div class="print-header-active text-center mb-8 border-b border-gray-200 dark:border-gray-700 pb-6">
+                <h2 class="displaySchoolName text-xl sm:text-2xl font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wide">...</h2>
+                <h3 class="displayTitle text-lg sm:text-xl font-bold text-blue-700 dark:text-blue-400 mt-2 honor-title">...</h3>
+                <div class="flex justify-center items-center gap-4 mt-2 text-sm sm:text-base font-bold text-gray-600 dark:text-gray-300">
+                    <span>ថ្នាក់ទី៖ <span class="displayClass text-red-600 dark:text-red-400">...</span></span><span class="text-gray-300 dark:text-gray-600">|</span><span>ឆ្នាំសិក្សា៖ <span class="displayYear text-blue-600 dark:text-blue-400">...</span></span>
+                </div>
+            </div>
+            <div id="honorRollTreeContainer" class="mb-10 min-h-[400px]"></div>
+            <div class="print-footer default-print-footer">
+                បង្កើតកម្មវិធីដោយ <b>HENG ROTHIVONG</b> | Telegram: t.me/Hengrothivong
+            </div>
+        </div>
+
+        <div id="tableDetail" class="detail-view bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden relative p-2 sm:p-4 print-area">
+            <div class="flex items-center justify-between mb-4 no-print">
+                <button onclick="showDashboard()" class="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>ត្រឡប់ទៅទំព័រដើម</button>
+                <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">តារាងបញ្ជីពិន្ទុ</h2>
+            </div>
+            
+            <div class="print-header">
+                <h2 class="displaySchoolName">...</h2>
+                <h3 class="displayTitle">...</h3>
+                <div>
+                    <span>ថ្នាក់ទី៖ <span class="displayClass font-bold">...</span></span> | <span>ឆ្នាំសិក្សា៖ <span class="displayYear font-bold">...</span></span>
+                </div>
+            </div>
+            
+            <div class="mb-4 flex flex-col lg:flex-row justify-between items-center gap-4 bg-gray-50 dark:bg-gray-800/50 p-2 sm:p-3 rounded-lg no-print">
+                <div id="statsBadge" class="flex flex-wrap justify-center gap-2 text-xs sm:text-sm font-bold w-full lg:w-auto"></div>
+                <div class="flex flex-wrap items-center justify-end gap-2 w-full lg:w-auto">
+                    <input type="text" id="searchInput" onkeyup="renderTable()" class="w-full sm:w-auto p-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:ring-2 focus:ring-blue-400" placeholder="ស្វែងរកឈ្មោះសិស្ស...">
+                    <button onclick="exportToExcel()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2.5 px-4 rounded-lg shadow-sm whitespace-nowrap transition flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>Excel</button>
+                    <button onclick="printLandscape()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2.5 px-4 rounded-lg shadow-sm transition flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>ព្រីន (Landscape)</button>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto h-[55vh] sm:h-[60vh] relative rounded-lg border border-gray-200 dark:border-gray-700 score-table-print">
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead class="bg-gray-200 dark:bg-gray-700 sticky top-0 z-20 shadow-sm"><tr id="tableHeaders"></tr></thead>
+                    <tbody id="studentList" class="bg-white dark:bg-gray-800"></tbody>
+                </table>
+            </div>
+            <div id="emptyState" class="p-10 text-center text-gray-500 dark:text-gray-400 font-medium bg-gray-50 dark:bg-gray-800/50 mt-4 rounded-lg no-print">មិនទាន់មានសិស្សក្នុងបញ្ជីទេ។</div>
+            <div class="print-footer default-print-footer">
+                បង្កើតកម្មវិធីដោយ <b>HENG ROTHIVONG</b> | Telegram: t.me/Hengrothivong
+            </div>
+        </div>
+
+        <div id="rankDetail" class="detail-view bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden relative p-4 sm:p-6 print-area max-w-5xl mx-auto">
+            <div class="flex items-center justify-between mb-4 no-print">
+                <button onclick="showDashboard()" class="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>ត្រឡប់ទៅទំព័រដើម</button>
+                <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">តារាងចំណាត់ថ្នាក់ & ស្ថិតិ</h2>
+            </div>
+            <div class="print-header">
+                <h2 class="displaySchoolName">...</h2>
+                <h3 class="displayTitle">តារាងកិត្តិយស និងស្ថិតិ</h3>
+                <div>
+                    <span>ថ្នាក់ទី៖ <span class="displayClass font-bold">...</span></span> | <span>ឆ្នាំសិក្សា៖ <span class="displayYear font-bold">...</span></span>
+                </div>
+            </div>
+            <div class="mb-4 flex justify-between items-center bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg border border-yellow-200 dark:border-yellow-700 no-print">
+                <h2 class="text-lg font-bold text-yellow-800 dark:text-yellow-400 flex items-center gap-2">🏆 តារាងចំណាត់ថ្នាក់ <span class="text-sm bg-yellow-200 dark:bg-yellow-700 px-2 py-1 rounded-full text-yellow-900 dark:text-yellow-100 displayPeriodText"></span></h2>
+                <button onclick="printPortrait()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-4 rounded-lg shadow-sm transition flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>ព្រីន (Portrait)</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 page-break-avoid">
+                <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 rounded-xl shadow-sm">
+                    <h4 class="font-bold text-blue-800 dark:text-blue-300 border-b border-blue-200 dark:border-blue-700 pb-2 mb-3 flex items-center gap-2">📊 ស្ថិតិសិស្សជាប់សរុប</h4>
+                    <div class="text-sm space-y-2 text-gray-700 dark:text-gray-300">
+                        <div class="flex justify-between"><span>មានពិន្ទុសរុប៖</span> <span class="font-bold text-gray-900 dark:text-white"><span id="statTotal">0</span> (ស្រី <span id="statTotalF">0</span>)</span></div>
+                        <div class="flex justify-between"><span>ប្រឡងជាប់៖</span> <span class="font-bold text-green-600 dark:text-green-400"><span id="statPass">0</span> (ស្រី <span id="statPassF">0</span>)</span></div>
+                        <div class="flex justify-between border-t border-blue-200 dark:border-blue-700 pt-2 mt-1"><span class="font-bold text-blue-900 dark:text-blue-300">ភាគរយជាប់៖</span> <span class="font-bold text-blue-700 dark:text-blue-400 text-base"><span id="statPassPercent">0%</span> (ស្រី <span id="statPassPercentF">0%</span>)</span></div>
+                    </div>
+                </div>
+                <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4 rounded-xl shadow-sm">
+                    <h4 class="font-bold text-green-800 dark:text-green-300 border-b border-green-200 dark:border-green-700 pb-2 mb-3 flex items-center gap-2">📝 និទ្ទេស (ខ្មែរ)</h4>
+                    <div class="grid grid-cols-2 text-sm gap-y-3 gap-x-2 text-gray-700 dark:text-gray-300">
+                        <div class="flex justify-between bg-white dark:bg-gray-800 px-2 py-1 rounded border border-green-100 dark:border-green-800"><span>ល្អ:</span> <span id="statKhGood" class="font-bold text-green-600 dark:text-green-400">0</span></div>
+                        <div class="flex justify-between bg-white dark:bg-gray-800 px-2 py-1 rounded border border-green-100 dark:border-green-800"><span>ល្អបង្គួរ:</span> <span id="statKhFair" class="font-bold text-blue-600 dark:text-blue-400">0</span></div>
+                        <div class="flex justify-between bg-white dark:bg-gray-800 px-2 py-1 rounded border border-green-100 dark:border-green-800"><span>មធ្យម:</span> <span id="statKhAvg" class="font-bold text-orange-500 dark:text-orange-400">0</span></div>
+                        <div class="flex justify-between bg-white dark:bg-gray-800 px-2 py-1 rounded border border-green-100 dark:border-green-800"><span>ខ្សោយ:</span> <span id="statKhPoor" class="font-bold text-red-600 dark:text-red-400">0</span></div>
+                    </div>
+                </div>
+                <div class="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 p-4 rounded-xl shadow-sm">
+                    <h4 class="font-bold text-purple-800 dark:text-purple-300 border-b border-purple-200 dark:border-purple-700 pb-2 mb-3 flex items-center gap-2">🔠 និទ្ទេស (A-F)</h4>
+                    <div class="grid grid-cols-3 text-sm gap-2 text-gray-700 dark:text-gray-300">
+                        <div class="text-center bg-white dark:bg-gray-800 py-1 rounded border border-purple-100 dark:border-purple-800">A: <span id="statEnA" class="font-bold text-green-600 dark:text-green-400">0</span></div>
+                        <div class="text-center bg-white dark:bg-gray-800 py-1 rounded border border-purple-100 dark:border-purple-800">B: <span id="statEnB" class="font-bold text-blue-600 dark:text-blue-400">0</span></div>
+                        <div class="text-center bg-white dark:bg-gray-800 py-1 rounded border border-purple-100 dark:border-purple-800">C: <span id="statEnC" class="font-bold text-yellow-600 dark:text-yellow-400">0</span></div>
+                        <div class="text-center bg-white dark:bg-gray-800 py-1 rounded border border-purple-100 dark:border-purple-800">D: <span id="statEnD" class="font-bold text-orange-500 dark:text-orange-400">0</span></div>
+                        <div class="text-center bg-white dark:bg-gray-800 py-1 rounded border border-purple-100 dark:border-purple-800">E: <span id="statEnE" class="font-bold text-purple-500 dark:text-purple-400">0</span></div>
+                        <div class="text-center bg-white dark:bg-gray-800 py-1 rounded border border-purple-100 dark:border-purple-800">F: <span id="statEnF" class="font-bold text-red-600 dark:text-red-400">0</span></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto rounded-lg">
+                <table class="w-full text-left text-sm border-collapse border border-gray-300 dark:border-gray-600 rank-table-print">
+                    <colgroup>
+                        <col width="6%"><col width="22%"><col width="5%"><col width="7%"><col width="6%"><col width="4%">
+                        <col width="6%"><col width="22%"><col width="5%"><col width="7%"><col width="6%"><col width="4%">
+                    </colgroup>
+                    <thead class="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                        <tr>
+                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ល.រ</th>
+                            <th class="px-3 py-2 font-bold border border-gray-300 dark:border-gray-600">គោត្តនាម-នាម</th>
+                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ភេទ</th>
+                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ពិន្ទុសរុប</th>
+                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">មធ្យមភាគ</th>
+                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">និទ្ទេស</th>
+                            
+                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600 border-l-4 border-l-gray-400 dark:border-l-gray-500">ល.រ</th>
+                            <th class="px-3 py-2 font-bold border border-gray-300 dark:border-gray-600">គោត្តនាម-នាម</th>
+                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ភេទ</th>
+                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ពិន្ទុសរុប</th>
+                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">មធ្យមភាគ</th>
+                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">និទ្ទេស</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rankList" class="bg-white dark:bg-gray-800">
+                    </tbody>
+                </table>
+            </div>
+            <div id="emptyRankState" class="p-10 text-center text-gray-500 dark:text-gray-400 font-medium bg-gray-50 dark:bg-gray-800/50 mt-4 rounded-lg no-print">មិនមានទិន្នន័យពិន្ទុសម្រាប់បង្ហាញទេ។</div>
+            <div class="print-footer default-print-footer">
+                បង្កើតកម្មវិធីដោយ <b>HENG ROTHIVONG</b> | Telegram: t.me/Hengrothivong
+            </div>
+        </div>
+
+        <div id="reportDetail" class="detail-view bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden relative p-4 sm:p-6 print-area max-w-[1400px] mx-auto">
+            <div class="flex flex-col sm:flex-row items-center justify-between mb-4 no-print gap-4">
+                <button onclick="showDashboard()" class="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>ត្រឡប់ទៅទំព័រដើម</button>
+                <div class="flex gap-2">
+                    <button onclick="switchReportTab('tab_monthly_report')" id="btn_tab_monthly_report" class="tab-btn active px-4 py-2 text-sm font-bold rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 whitespace-nowrap">ប្រចាំខែ/ឆមាស</button>
+                    <button onclick="switchReportTab('tab_annual_report')" id="btn_tab_annual_report" class="tab-btn px-4 py-2 text-sm font-bold rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 whitespace-nowrap">ប្រចាំឆ្នាំ</button>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="exportReportToExcel()" class="bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2.5 px-4 rounded-lg shadow-sm transition flex items-center gap-1.5 whitespace-nowrap">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        ទាញយក Excel
+                    </button>
+                    <button onclick="printLandscape()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2.5 px-4 rounded-lg shadow-sm transition flex items-center gap-1.5 whitespace-nowrap">ព្រីន (Landscape)</button>
+                </div>
+            </div>
+            
+            <div class="print-header">
+                <h2 class="displaySchoolName">...</h2>
+                <h3 class="displayTitle">របាយការណ៍</h3>
+                <div><span>ថ្នាក់ទី៖ <span class="displayClass font-bold">...</span></span> | <span>ឆ្នាំសិក្សា៖ <span class="displayYear font-bold">...</span></span></div>
+            </div>
+
+            <div id="tab_monthly_report" class="tab-content active overflow-x-auto">
+                <table class="w-full text-center text-sm border-collapse border border-blue-900 mb-4">
+                    <thead class="bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100">
+                        <tr>
+                            <th rowspan="2" class="border border-blue-900 p-2">ល.រ</th><th rowspan="2" class="border border-blue-900 p-2">សរុបសិស្ស</th><th rowspan="2" class="border border-blue-900 p-2">ស្រី</th>
+                            <th colspan="3" class="border border-blue-900 p-2 text-green-700">ល្អ</th><th colspan="3" class="border border-blue-900 p-2 text-blue-700">ល្អបង្គួរ</th>
+                            <th colspan="3" class="border border-blue-900 p-2 text-yellow-700">មធ្យម</th><th colspan="3" class="border border-blue-900 p-2 text-orange-700">ខ្សោយ</th>
+                            <th colspan="3" class="border border-blue-900 p-2 text-red-700">មិនចាត់ថ្នាក់</th><th rowspan="2" class="border border-blue-900 p-2">ផ្សេងៗ</th>
+                        </tr>
+                        <tr>
+                            <th class="border border-blue-900 p-1">សរុប</th><th class="border border-blue-900 p-1">ស្រី</th><th class="border border-blue-900 p-1">ភាគរយ</th>
+                            <th class="border border-blue-900 p-1">សរុប</th><th class="border border-blue-900 p-1">ស្រី</th><th class="border border-blue-900 p-1">ភាគរយ</th>
+                            <th class="border border-blue-900 p-1">សរុប</th><th class="border border-blue-900 p-1">ស្រី</th><th class="border border-blue-900 p-1">ភាគរយ</th>
+                            <th class="border border-blue-900 p-1">សរុប</th><th class="border border-blue-900 p-1">ស្រី</th><th class="border border-blue-900 p-1">ភាគរយ</th>
+                            <th class="border border-blue-900 p-1">សរុប</th><th class="border border-blue-900 p-1">ស្រី</th><th class="border border-blue-900 p-1">ភាគរយ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTable1Body" class="bg-white dark:bg-gray-800 font-bold"></tbody>
+                </table>
+                <table class="w-full text-center text-sm border-collapse border border-blue-900">
+                    <thead class="bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100">
+                        <tr>
+                            <th rowspan="2" class="border border-blue-900 p-2">ល.រ</th><th rowspan="2" class="border border-blue-900 p-2">ឈ្មោះសាលា</th><th rowspan="2" class="border border-blue-900 p-2">សរុបសិស្ស</th><th rowspan="2" class="border border-blue-900 p-2">ស្រី</th><th rowspan="2" class="border border-blue-900 p-2">បោះបង់</th><th rowspan="2" class="border border-blue-900 p-2">ស្រី</th>
+                            <th colspan="2" class="border border-blue-900 p-2">A</th><th colspan="2" class="border border-blue-900 p-2">B</th><th colspan="2" class="border border-blue-900 p-2">C</th>
+                            <th colspan="2" class="border border-blue-900 p-2">D</th><th colspan="2" class="border border-blue-900 p-2">E</th><th colspan="2" class="border border-blue-900 p-2">F</th><th rowspan="2" class="border border-blue-900 p-2">ផ្សេងៗ</th>
+                        </tr>
+                        <tr>
+                            <th class="border border-blue-900 p-1">សរុប</th><th class="border border-blue-900 p-1">ស្រី</th><th class="border border-blue-900 p-1">សរុប</th><th class="border border-blue-900 p-1">ស្រី</th>
+                            <th class="border border-blue-900 p-1">សរុប</th><th class="border border-blue-900 p-1">ស្រី</th><th class="border border-blue-900 p-1">សរុប</th><th class="border border-blue-900 p-1">ស្រី</th>
+                            <th class="border border-blue-900 p-1">សរុប</th><th class="border border-blue-900 p-1">ស្រី</th><th class="border border-blue-900 p-1">សរុប</th><th class="border border-blue-900 p-1">ស្រី</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTable2Body" class="bg-white dark:bg-gray-800 font-bold"></tbody>
+                </table>
+            </div>
+
+            <div id="tab_annual_report" class="tab-content overflow-x-auto">
+                <table class="w-full text-center text-sm border-collapse border border-blue-900">
+                    <thead class="bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100">
+                        <tr><th class="border border-blue-900 p-2">ល.រ</th><th class="border border-blue-900 p-2">អត្តលេខ</th><th class="border border-blue-900 p-2">នាម និងគោត្តនាម</th><th class="border border-blue-900 p-2">ភេទ</th><th class="border border-blue-900 p-2">មធ្យមភាគ ឆ១</th><th class="border border-blue-900 p-2">មធ្យមភាគ ឆ២</th><th class="border border-blue-900 p-2">មធ្យមភាគប្រចាំឆ្នាំ</th><th class="border border-blue-900 p-2">ចំណាត់ថ្នាក់</th><th class="border border-blue-900 p-2">និទ្ទេស</th><th class="border border-blue-900 p-2">ផ្សេងៗ</th></tr>
+                    </thead>
+                    <tbody id="annualReportTableBody" class="bg-white dark:bg-gray-800"></tbody>
+                </table>
+                <table class="w-full mt-4 text-sm text-blue-900 dark:text-blue-100"><tbody id="annualSummaryBody"></tbody></table>
+            </div>
+        </div>
+
+        <div id="registerDetail" class="detail-view bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 max-w-5xl mx-auto space-y-8 no-print">
+            <div class="flex items-center justify-between mb-4">
+                <button onclick="showDashboard()" class="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>ត្រឡប់ទៅទំព័រដើម</button>
+                <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">កំណត់ប្រព័ន្ធ & ចុះឈ្មោះ</h2>
+            </div>
+            
+            <div class="bg-blue-50/50 dark:bg-gray-700/30 p-4 sm:p-6 rounded-xl border border-blue-100 dark:border-gray-600">
+                <div class="flex justify-between items-center mb-4 border-b border-blue-200 dark:border-gray-600 pb-2">
+                    <h2 class="text-lg sm:text-xl font-bold text-blue-800 dark:text-blue-300">១. កំណត់ព័ត៌មានក្បាលតារាងសាលា</h2>
+                    <button onclick="saveSchoolInfo()" id="btnSaveInfo" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-sm transition">រក្សាទុកព័ត៌មាន</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ឈ្មោះសាលា</label><input type="text" id="info_school" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:border-blue-500"></div>
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ខេត្ត/រាជធានី</label><input type="text" id="info_province" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:border-blue-500" placeholder="ឧ. កំពង់ធំ"></div>
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ចំណងជើងក្បាល</label><input type="text" id="info_title" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:border-blue-500"></div>
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ថ្នាក់ទី</label><input type="text" id="info_class" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:border-blue-500"></div>
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ឆ្នាំសិក្សា</label><input type="text" id="info_year" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:border-blue-500"></div>
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ប្រចាំខែ/ឆមាស</label><input type="text" id="info_period" readonly class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 outline-none cursor-not-allowed font-bold" value=""></div>
+                </div>
+            </div>
+            
+            <div>
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b dark:border-gray-700 pb-4 gap-4">
+                    <h2 id="regFormTitle" class="text-xl font-bold text-gray-800 dark:text-gray-100">២. ចុះឈ្មោះសិស្សថ្មីចូលបញ្ជី (ព័ត៌មានលម្អិត)</h2>
+                    <div class="flex items-center gap-2 bg-green-50 dark:bg-green-900/30 p-2 rounded-lg border border-green-200 dark:border-green-800 w-full sm:w-auto">
+                        <div class="text-[11px] sm:text-xs text-green-700 dark:text-green-400 leading-tight"><strong>ទម្រង់ Excel សម្រាប់ Import៖</strong><br>ជួរឈរត្រូវមានឈ្មោះ៖ <b>ឈ្មោះ</b> | <b>ភេទ</b> | <b>ថ្ងៃខែឆ្នាំកំណើត</b></div>
+                        <input type="file" id="excelFileInput" accept=".xlsx, .xls" class="hidden" onchange="importFromExcel(event)">
+                        <button onclick="document.getElementById('excelFileInput').click()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 sm:px-4 rounded-lg text-sm shadow-sm transition whitespace-nowrap">Import ពី Excel</button>
+                    </div>
+                </div>
+
+                <h3 class="text-md font-bold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">👤 ព័ត៌មានផ្ទាល់ខ្លួន</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ឈ្មោះសិស្ស <span class="text-red-500">*</span></label><input type="text" id="reg_name" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none font-medium focus:border-blue-500"></div>
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ភេទ</label><select id="reg_gender" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none font-medium"><option value="ប្រុស (ប)">ប្រុស (ប)</option><option value="ស្រី (ស)">ស្រី (ស)</option></select></div>
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ថ្ងៃខែឆ្នាំកំណើត</label><input type="date" id="reg_dob" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none font-medium text-gray-700 dark:text-gray-200"></div>
+                </div>
+
+                <h3 class="text-md font-bold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">👨‍👩‍👦 ព័ត៌មានមាតាបិតា</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ឈ្មោះឪពុក</label><input type="text" id="reg_father_name" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:border-blue-500" placeholder="..."></div>
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">មុខរបរឪពុក</label><input type="text" id="reg_father_job" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:border-blue-500" placeholder="..."></div>
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ឈ្មោះម្ដាយ</label><input type="text" id="reg_mother_name" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:border-blue-500" placeholder="..."></div>
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">មុខរបរម្ដាយ</label><input type="text" id="reg_mother_job" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:border-blue-500" placeholder="..."></div>
+                </div>
+
+                <h3 class="text-md font-bold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">🏠 ទីលំនៅបច្ចុប្បន្ន</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ភូមិ</label><input type="text" id="reg_curr_village" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:border-blue-500" placeholder="..."></div>
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ឃុំ / សង្កាត់</label><input type="text" id="reg_curr_commune" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:border-blue-500" placeholder="..."></div>
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ស្រុក / ក្រុង / ខណ្ឌ</label><input type="text" id="reg_curr_district" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:border-blue-500" placeholder="..."></div>
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ខេត្ត / រាជធានី</label><input type="text" id="reg_curr_province" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:border-blue-500" placeholder="..."></div>
+                </div>
+
+                <h3 class="text-md font-bold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">📌 ព័ត៌មានផ្សេងៗ</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">លេខទូរស័ព្ទទំនាក់ទំនង</label><input type="text" id="reg_phone" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:border-blue-500" placeholder="..."></div>
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ផ្ទេរមកពីសាលា</label><input type="text" id="reg_transfer_from" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none focus:border-blue-500" placeholder="..."></div>
+                    <div><label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ស្ថានភាពគ្រួសារ</label>
+                        <select id="reg_family_status" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 outline-none">
+                            <option value="">-- ជ្រើសរើស --</option><option value="ធម្មតា">ធម្មតា</option><option value="ក្រីក្រកម្រិត ១">ក្រីក្រកម្រិត ១</option><option value="ក្រីក្រកម្រិត ២">ក្រីក្រកម្រិត ២</option><option value="កំព្រាឪពុក">កំព្រាឪពុក</option><option value="កំព្រាម្ដាយ">កំព្រាម្ដាយ</option><option value="កំព្រាទាំងសងខាង">កំព្រាទាំងសងខាង</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button id="btnCancelReg" onclick="cancelRegister()" class="hidden bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-bold py-2.5 px-6 rounded-lg transition">បោះបង់</button>
+                    <button onclick="saveStudentRegistration()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-8 rounded-lg shadow-md transition w-full sm:w-auto">រក្សាទុកឈ្មោះ</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="scoreTab" class="detail-view bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 max-w-5xl mx-auto no-print">
+            <div class="flex items-center justify-between mb-4">
+                <button onclick="showDashboard()" class="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>ត្រឡប់ទៅទំព័រដើម</button>
+                <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">បញ្ចូលពិន្ទុ</h2>
+            </div>
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 border-b dark:border-gray-700 pb-4 gap-2">
+                <h2 class="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-100">ពិន្ទុរបស់៖ <span id="scoreStudentName" class="text-blue-600 dark:text-blue-400"></span></h2>
+                <span id="scorePeriodLabel" class="bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 font-bold px-4 py-1.5 rounded-full text-sm border border-yellow-200 dark:border-yellow-700"></span>
+            </div>
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-100 dark:border-gray-600">💡 <b>គន្លឹះ៖</b> មុខវិជ្ជាណាដែលសិស្សមិនបានប្រឡង សូមទុកប្រអប់ចោលទទេ (កុំវាយលេខសូន្យ)។</p>
+            <div id="subjectInputsContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-9 gap-3 sm:gap-4 mb-8"></div>
+            <div class="flex flex-col-reverse sm:flex-row gap-3 justify-end border-t dark:border-gray-700 pt-4">
+                <button onclick="showDashboard()" class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-bold py-3 sm:py-2.5 px-6 rounded-lg transition w-full sm:w-auto">ត្រឡប់ក្រោយ</button>
+                <button onclick="saveScores()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 sm:py-2.5 px-8 rounded-lg shadow-md transition w-full sm:w-auto">រក្សាទុកពិន្ទុ</button>
+            </div>
+        </div>
+
+        <div id="undoToast" class="fixed bottom-4 right-4 bg-gray-800 dark:bg-gray-700 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-4 transition-transform transform translate-y-20 opacity-0 z-50 no-print">
+            <span id="undoMessage" class="text-sm font-medium">បានលុបសិស្ស</span>
+            <button onclick="undoDelete()" class="text-yellow-400 font-bold hover:underline text-sm">ត្រឡប់វិញ (Undo)</button>
+            <button onclick="hideUndoToast()" class="text-gray-400 hover:text-white text-sm">✕</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Dark Mode & Print Utilities ---
+        function toggleTheme() {
+            const htmlClass = document.documentElement.classList;
+            htmlClass.toggle('dark');
+            const isDark = htmlClass.contains('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateThemeUI(isDark);
+        }
+        function updateThemeUI(isDark) {
+            document.getElementById('themeIcon').innerText = isDark ? '☀️' : '🌙';
+            document.getElementById('themeText').innerText = isDark ? 'Light Mode' : 'Dark Mode';
+        }
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark'); updateThemeUI(true);
+        } else {
+            document.documentElement.classList.remove('dark'); updateThemeUI(false);
+        }
+
+        function printLandscape() {
+            let style = document.createElement('style');
+            style.id = 'print-orientation';
+            style.innerHTML = '@media print { @page { size: landscape; margin: 10mm; } }';
+            document.head.appendChild(style);
+            window.print();
+            setTimeout(() => document.head.removeChild(style), 1000);
+        }
+
+        function printPortrait() {
+            let style = document.createElement('style');
+            style.id = 'print-orientation';
+            style.innerHTML = '@media print { @page { size: portrait; margin: 10mm 8mm; } }';
+            document.head.appendChild(style);
+            window.print();
+            setTimeout(() => document.head.removeChild(style), 1000);
+        }
+
+        const subjectList = [
+            { id: 'sub_dictation', name: 'សរសេរតាមអាន' }, { id: 'sub_composition', name: 'តែងសេចក្តី' },
+            { id: 'sub_reading', name: 'អំណាន' }, { id: 'sub_khmer', name: 'ភាសាខ្មែរ' },
+            { id: 'sub_civics', name: 'សីល.-ពលរដ្ឋ' }, { id: 'sub_history', name: 'ប្រវត្តិវិទ្យា' },
+            { id: 'sub_geo', name: 'ភូមិវិទ្យា' }, { id: 'sub_math', name: 'គណិតវិទ្យា' },
+            { id: 'sub_physics', name: 'រូបវិទ្យា' }, { id: 'sub_chem', name: 'គីមីវិទ្យា' },
+            { id: 'sub_bio', name: 'ជីវៈវិទ្យា' }, { id: 'sub_earth', name: 'ផែនដីវិទ្យា' },
+            { id: 'sub_home', name: 'គេហវិទ្យា' }, { id: 'sub_pe', name: 'អប់រំកាយ' },
+            { id: 'sub_life', name: 'បំណិនជីវិត' }, { id: 'sub_art', name: 'សិល្បៈ' },
+            { id: 'sub_agri', name: 'កសិកម្ម' }, { id: 'sub_foreign', name: 'ភាសាបរទេស' }
+        ];
+
+        let students = JSON.parse(localStorage.getItem('studentDataV12')) || [];
+        let schoolInfo = JSON.parse(localStorage.getItem('schoolInfoV12')) || {
+            schoolName: 'អនុវិទ្យាល័យ ម្រាក', province: 'កំពង់ធំ', title: 'តារាងកិត្តិយស', className: '៨ ក', academicYear: '២០២៥-២០២៦'
+        // ១. ភ្ជាប់ Firebase ទៅគម្រោងរបស់អ្នក
+        // សូមយក firebaseConfig ដែលអ្នកបានកូពីពី Firebase មកដាក់នៅទីនេះ
+        const firebaseConfig = {
+            apiKey: "AIzaSyYourApiKeyHere...",
+            authDomain: "your-project-id.firebaseapp.com",
+            projectId: "your-project-id",
+            storageBucket: "your-project-id.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abcdef123456"
+        };
+        
+        let scheduleData = JSON.parse(localStorage.getItem('scheduleDataV12')) || {};
+        let seatingData = JSON.parse(localStorage.getItem('seatingDataV12')) || {};
+        let bookBorrowingData = JSON.parse(localStorage.getItem('bookBorrowingDataV12')) || {};
+        // Add this line to store denominators per period
+        let periodDenominators = JSON.parse(localStorage.getItem('periodDenominatorsV12')) || {};
+        // Initialize Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+
+        // ២. អថេរសម្រាប់ផ្ទុកទិន្នន័យ (លុប localStorage ចេញ)
+        let students = [];
+        let schoolInfo = {
+            schoolName: 'អនុវិទ្យាល័យ ម្រាក', province: 'កំពង់ធំ', title: 'តារាងកិត្តិយស', className: '៨ ក', academicYear: '២០២៥-២០២៦'
+        };
+        let scheduleData = {};
+        let seatingData = {};
+        let bookBorrowingData = {};
+        let periodDenominators = {};
+
+        let editingStudentId = null; 
+        let currentScoringStudentId = null; 
+        let currentRankTab = 'current';
+        let deletedHistory = [];
+
+        function resetNavButtons() {
+            const btns = ['btn_dashboard', 'btn_table', 'btn_rank', 'btn_admin', 'btn_register', 'btn_report'];
+            btns.forEach(id => {
+                let el = document.getElementById(id);
+                if(el) el.className = 'flex-1 sm:flex-none px-4 sm:px-6 py-2.5 font-bold text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition whitespace-nowrap';
+            });
+        }
+
+        function showDashboard() {
+            document.querySelectorAll('.detail-view').forEach(el => el.classList.remove('active'));
+            document.getElementById('mainDashboard').style.display = 'grid';
+            resetNavButtons();
+            document.getElementById('btn_dashboard').className = 'flex-1 sm:flex-none px-4 sm:px-6 py-2.5 font-bold text-sm rounded-lg bg-blue-600 text-white shadow-md transition whitespace-nowrap';
+            updateDashboardStats();
+        }
+
+        function switchReportTab(tabId) {
+            document.querySelectorAll('#reportDetail .tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('#reportDetail .tab-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(tabId).classList.add('active');
+            document.getElementById('btn_' + tabId).classList.add('active');
+            
+            if (tabId === 'tab_monthly_report') renderReport();
+            if (tabId === 'tab_annual_report') renderAnnualReport();
+        }
+
+        function showDetail(detailId) {
+            document.getElementById('mainDashboard').style.display = 'none';
+            document.querySelectorAll('.detail-view').forEach(el => el.classList.remove('active'));
+            document.getElementById(detailId).classList.add('active');
+            resetNavButtons();
+            
+            let btnId = '';
+            if (detailId === 'tableDetail') btnId = 'btn_table';
+            else if (detailId === 'rankDetail') btnId = 'btn_rank';
+            else if (detailId === 'registerDetail') btnId = 'btn_register';
+            else if (detailId === 'classAdminDetail') btnId = 'btn_admin';
+            else if (detailId === 'reportDetail') btnId = 'btn_report';
+
+            if(btnId && document.getElementById(btnId)) {
+                document.getElementById(btnId).className = 'flex-1 sm:flex-none px-4 sm:px-6 py-2.5 font-bold text-sm rounded-lg bg-blue-600 text-white shadow-md transition whitespace-nowrap';
+            }
+
+            if (detailId === 'tableDetail' || detailId === 'rankDetail') renderTable();
+            else if (detailId === 'registerDetail') initSchoolInfo();
+            else if (detailId === 'reportDetail') {
+                if(document.getElementById('tab_annual_report').classList.contains('active')) renderAnnualReport();
+                else renderReport();
+            }
+            else if (detailId === 'classAdminDetail') {
+                renderAdminStudentList();
+                renderCleaningSchedule();
+                loadSchedule();
+                renderSeatingPlan();
+                renderBookBorrowing();
+                updateAdminHeaders();
+            }
+        }
+
+        function showHonorRoll() {
+            document.getElementById('mainDashboard').style.display = 'none';
+            document.querySelectorAll('.detail-view').forEach(el => el.classList.remove('active'));
+            document.getElementById('honorRollDetail').classList.add('active');
+            resetNavButtons();
+            renderHonorRoll();
+        }
+
+        // ៣. អនុគមន៍សម្រាប់ទាញយកទិន្នន័យពី Firebase នៅពេលបើកកម្មវិធីដំបូង
+        function loadDataFromFirebase() {
+            // បង្ហាញ Loading ...
+            document.getElementById('dashboardStudentCount').innerText = 'កំពុងទាញយក...';
+            
+            db.collection("schoolApp").doc("mainData").get().then((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    students = data.students || [];
+                    schoolInfo = data.schoolInfo || schoolInfo;
+                    scheduleData = data.scheduleData || {};
+                    seatingData = data.seatingData || {};
+                    bookBorrowingData = data.bookBorrowingData || {};
+                    periodDenominators = data.periodDenominators || {};
+                }
+                
+                // បន្ទាប់ពីទាញទិន្នន័យបានជោគជ័យ ទើបឱ្យវាបង្ហាញ UI
+                buildUI();
+                showDashboard();
+                updateDashboardStats();
+            }).catch((error) => {
+                console.error("Error loading data: ", error);
+                alert("មិនអាចភ្ជាប់ទៅកាន់ Database បានទេ!");
+            });
+        }
+
+        // New function to handle period changes and update the denominator input
+        function handlePeriodChange() {
+            const periodId = document.getElementById('periodSelector').value;
+            const savedDenom = periodDenominators[periodId] || 18;
+            document.getElementById('avgDenominator').value = savedDenom;
+            refreshData();
+        }
+
+        // New function to handle changes typed into the denominator input
+        function handleDenominatorChange() {
+            const periodId = document.getElementById('periodSelector').value;
+            let valText = document.getElementById('avgDenominator').value;
+            if (valText !== '') {
+                periodDenominators[periodId] = parseFloat(valText);
+                localStorage.setItem('periodDenominatorsV12', JSON.stringify(periodDenominators));
+                // ដូរពី localStorage ទៅ Firebase
+                saveAllDataToFirebase();
+                refreshData();
+            }
+        }
+
+        function refreshData() {
+            const pSel = document.getElementById('periodSelector');
+            const pName = pSel.options[pSel.selectedIndex].text;
+            if (document.getElementById('info_period')) document.getElementById('info_period').value = pName;
+
+            if (document.getElementById('tableDetail').classList.contains('active') || document.getElementById('rankDetail').classList.contains('active')) renderTable();
+            else if (document.getElementById('honorRollDetail').classList.contains('active')) renderHonorRoll();
+            else if (document.getElementById('reportDetail').classList.contains('active')) {
+                if(document.getElementById('tab_annual_report').classList.contains('active')) renderAnnualReport();
+                else renderReport();
+            }
+            else if (document.getElementById('classAdminDetail').classList.contains('active')) {
+                updateAdminHeaders();
+                renderAdminStudentList();
+                renderCleaningSchedule();
+                renderSeatingPlan();
+            }
+            updateDashboardStats();
+        }
+
+        function switchAdminTab(tabId) {
+            const adminContainer = document.getElementById('classAdminDetail');
+            adminContainer.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            adminContainer.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(tabId).classList.add('active');
+            document.getElementById('btn_' + tabId).classList.add('active');
+
+            let printTitle = 'បញ្ជីរដ្ឋបាល';
+            let useReportHeader = false;
+
+            if(tabId === 'tab_studentList') printTitle = 'បញ្ជីឈ្មោះសិស្សប្រចាំថ្នាក់';
+            else if(tabId === 'tab_cleaning') printTitle = 'បញ្ជីវេណសម្អាតថ្នាក់រៀន';
+            else if(tabId === 'tab_schedule') { printTitle = 'កាលវិភាគសិក្សា'; loadSchedule(); }
+            else if(tabId === 'tab_seating') { printTitle = 'ប្លង់តុអង្គុយរបស់សិស្ស'; renderSeatingPlan(); }
+            else if(tabId === 'tab_inventory') printTitle = 'បញ្ជីសារពើភណ្ឌក្នុងថ្នាក់រៀន';
+            else if(tabId === 'tab_book_borrowing') { 
+                useReportHeader = true; 
+                renderBookBorrowing(); 
+            }
+            
+            if (useReportHeader) {
+                document.getElementById('defaultAdminPrintHeader').style.display = 'none';
+                document.getElementById('reportStylePrintHeader').classList.remove('hidden');
+                document.getElementById('reportStylePrintHeader').style.display = 'block';
+            } else {
+                document.getElementById('reportStylePrintHeader').classList.add('hidden');
+                document.getElementById('reportStylePrintHeader').style.display = 'none';
+                document.getElementById('defaultAdminPrintHeader').style.display = 'block';
+                document.getElementById('adminPrintTitle').innerText = printTitle;
+            }
+        }
+
+        function renderAdminStudentList() {
+            const tbody = document.getElementById('adminStudentListBody');
+            tbody.innerHTML = '';
+            if (students.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">មិនទាន់មានសិស្សក្នុងបញ្ជីទេ</td></tr>';
+                return;
+            }
+            students.forEach((s, index) => {
+                let dobFormatted = '';
+                if(s.dob) {
+                    const parts = s.dob.split('-');
+                    if(parts.length === 3) dobFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                }
+                
+                let otherHtml = '';
+                if(s.father_name) otherHtml += `<div><b>ឪពុក៖</b> ${s.father_name} ${s.father_job ? '('+s.father_job+')' : ''}</div>`;
+                if(s.mother_name) otherHtml += `<div><b>ម្ដាយ៖</b> ${s.mother_name} ${s.mother_job ? '('+s.mother_job+')' : ''}</div>`;
+                if(s.phone) otherHtml += `<div><b>ទូរស័ព្ទ៖</b> ${s.phone}</div>`;
+                if(s.family_status) otherHtml += `<div class="text-red-600 dark:text-red-400"><b>ស្ថានភាព៖</b> ${s.family_status}</div>`;
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <td class="px-3 py-1.5 text-center text-sm font-bold text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600">${index + 1}</td>
+                        <td class="px-4 py-1.5 font-bold text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600">${s.name}</td>
+                        <td class="px-3 py-1.5 text-center text-sm text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">${s.gender}</td>
+                        <td class="px-4 py-1.5 text-center text-sm text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">${dobFormatted}</td>
+                        <td class="px-4 py-1.5 text-xs border border-gray-300 dark:border-gray-600">${otherHtml}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderCleaningSchedule() {
+            const tbody = document.getElementById('cleaningScheduleBody');
+            tbody.innerHTML = '';
+            
+            if (students.length === 0) {
+                for(let i=0; i<5; i++) {
+                    tbody.innerHTML += `<tr><td class="px-4 py-4 border border-gray-300 dark:border-gray-600"></td><td class="px-4 py-4 border border-gray-300 dark:border-gray-600"></td><td class="px-4 py-4 border border-gray-300 dark:border-gray-600"></td><td class="px-4 py-4 border border-gray-300 dark:border-gray-600"></td><td class="px-4 py-4 border border-gray-300 dark:border-gray-600"></td><td class="px-4 py-4 border border-gray-300 dark:border-gray-600"></td></tr>`;
+                }
+                return;
+            }
+
+            let boys = students.filter(s => s.gender === 'ប្រុស (ប)');
+            let girls = students.filter(s => s.gender === 'ស្រី (ស)');
+            
+            let mixedStudents = [];
+            let maxLen = Math.max(boys.length, girls.length);
+            for(let i = 0; i < maxLen; i++) {
+                if(i < girls.length) mixedStudents.push(girls[i]);
+                if(i < boys.length) mixedStudents.push(boys[i]);
+            }
+
+            let days = [[], [], [], [], [], []]; 
+            mixedStudents.forEach((student, index) => {
+                days[index % 6].push(student.name);
+            });
+
+            let maxRowsNeeded = Math.max(...days.map(d => d.length), 3); 
+
+            for(let r = 0; r < maxRowsNeeded; r++) {
+                let trHtml = `<tr class="hover:bg-gray-50 dark:hover:bg-gray-700">`;
+                for(let c = 0; c < 6; c++) {
+                    let name = days[c][r] || "";
+                    trHtml += `<td class="px-4 py-3 border border-gray-300 dark:border-gray-600 text-center font-medium text-gray-800 dark:text-gray-200">${name}</td>`;
+                }
+                trHtml += `</tr>`;
+                tbody.innerHTML += trHtml;
+            }
+        }
+
+        function saveSchedule() {
+            document.querySelectorAll('.schedule-cell').forEach(cell => {
+                scheduleData[cell.id] = cell.innerText;
+            });
+            localStorage.setItem('scheduleDataV12', JSON.stringify(scheduleData));
+            // ដូរពី localStorage ទៅ Firebase
+            saveAllDataToFirebase();
+            
+            const btn = event.currentTarget;
+            const originText = btn.innerText;
+            btn.innerText = '✓ បានរក្សាទុក';
+            setTimeout(() => { btn.innerText = originText; }, 2000);
+        }
+
+        function loadSchedule() {
+            document.querySelectorAll('.schedule-cell').forEach(cell => {
+                if(scheduleData[cell.id]) cell.innerText = scheduleData[cell.id];
+            });
+        }
+
+        function renderSeatingPlan() {
+            const grid = document.getElementById('seatingGrid');
+            grid.innerHTML = '';
+            
+            let totalStudents = students.length;
+            let desksNeeded = Math.max(Math.ceil(totalStudents / 2), 8);
+            let remainder = desksNeeded % 4;
+            if(remainder !== 0) desksNeeded += (4 - remainder);
+
+            for(let i=1; i<=desksNeeded; i++) {
+                let seat1Id = `desk${i}_1`;
+                let seat2Id = `desk${i}_2`;
+                let val1 = seatingData[seat1Id] || "";
+                let val2 = seatingData[seat2Id] || "";
+
+                let deskHtml = `
+                <div class="pt-6 pb-3 px-2 sm:px-3 bg-white dark:bg-gray-700 border-[3px] border-gray-400 dark:border-gray-500 rounded shadow-sm relative flex flex-col gap-2 transition hover:border-blue-400">
+                    <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-0.5 rounded-full border border-blue-200 dark:border-blue-700 whitespace-nowrap">តុទី ${i}</div>
+                    
+                    <div class="flex gap-1 sm:gap-2">
+                        <div class="w-1/2">
+                            <select id="${seat1Id}" class="seating-select w-full text-[10px] sm:text-xs p-1 sm:p-1.5 border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 outline-none focus:ring-1 focus:ring-blue-500">
+                                <option value="">-- ទទេ --</option>
+                                ${students.map(s => `<option value="${s.id}" ${s.id == val1 ? 'selected' : ''}>${s.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="w-1/2">
+                            <select id="${seat2Id}" class="seating-select w-full text-[10px] sm:text-xs p-1 sm:p-1.5 border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 outline-none focus:ring-1 focus:ring-blue-500">
+                                <option value="">-- ទទេ --</option>
+                                ${students.map(s => `<option value="${s.id}" ${s.id == val2 ? 'selected' : ''}>${s.name}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                </div>`;
+                grid.innerHTML += deskHtml;
+            }
+        }
+
+        function saveSeatingPlan() {
+            document.querySelectorAll('.seating-select').forEach(select => {
+                seatingData[select.id] = select.value;
+            });
+            localStorage.setItem('seatingDataV12', JSON.stringify(seatingData));
+            // ដូរពី localStorage ទៅ Firebase
+            saveAllDataToFirebase();
+            
+            const btn = event.currentTarget;
+            const originText = btn.innerText;
+            btn.innerText = '✓ បានរក្សាទុក';
+            setTimeout(() => { btn.innerText = originText; }, 2000);
+        }
+
+        function renderBookBorrowing() {
+            const hRow1 = document.getElementById('borrowingHeaderRow1');
+            const hRow2 = document.getElementById('borrowingHeaderRow2');
+            const tbody = document.getElementById('borrowingTableBody');
+            const tfoot = document.getElementById('borrowingTableFooter');
+            const summaryDiv = document.getElementById('borrowingSummary');
+
+            const bookSubjects = subjectList.filter(sub => !['sub_dictation', 'sub_composition', 'sub_reading', 'sub_pe', 'sub_art', 'sub_life'].includes(sub.id));
+
+            let h1HTML = `
+                <th rowspan="2" class="border border-blue-900 p-1 w-[2%]">ល.រ</th>
+                <th rowspan="2" class="border border-blue-900 p-1 w-[12%]">គោត្តនាម-នាម</th>
+                <th rowspan="2" class="border border-blue-900 p-1 w-[3%]">ភេទ</th>
+            `;
+            let h2HTML = ``;
+
+            bookSubjects.forEach(sub => {
+                h1HTML += `<th colspan="2" class="border border-blue-900 p-0 align-bottom"><div class="vertical-text mx-auto h-[75px]">${sub.name}</div></th>`;
+                h2HTML += `<th class="border border-blue-900 p-0 text-[9px] font-normal">ថ្មី</th><th class="border border-blue-900 p-0 text-[9px] font-normal">ចាស់</th>`;
+            });
+            h1HTML += `<th rowspan="2" class="border border-blue-900 p-1 text-[10px] w-[5%]">សរុប</th><th rowspan="2" class="border border-blue-900 p-1 text-[10px] w-[5%]">ផ្សេងៗ</th>`;
+
+            hRow1.innerHTML = h1HTML;
+            hRow2.innerHTML = h2HTML;
+
+            tbody.innerHTML = '';
+            let totalStudents = students.length;
+            let femaleStudents = students.filter(s => s.gender === 'ស្រី (ស)').length;
+
+            if (totalStudents === 0) {
+                tbody.innerHTML = `<tr><td colspan="${5 + bookSubjects.length * 2}" class="p-8 text-center text-gray-500">មិនទាន់មានសិស្សក្នុងបញ្ជីទេ</td></tr>`;
+                tfoot.innerHTML = '';
+                summaryDiv.innerHTML = '';
+                return;
+            }
+
+            students.forEach((s, idx) => {
+                let rowHTML = `
+                    <tr class="hover:bg-blue-50 dark:hover:bg-gray-700 transition">
+                        <td class="border border-blue-900 p-1 text-center text-xs">${idx + 1}</td>
+                        <td class="border border-blue-900 p-1 text-left text-xs font-bold whitespace-nowrap overflow-hidden text-ellipsis px-2">${s.name}</td>
+                        <td class="border border-blue-900 p-1 text-center text-[10px]">${s.gender === 'ប្រុស (ប)' ? 'ប' : 'ស'}</td>
+                `;
+                
+                bookSubjects.forEach(sub => {
+                    let vNew = bookBorrowingData[`${s.id}_${sub.id}_new`] || '';
+                    let vOld = bookBorrowingData[`${s.id}_${sub.id}_old`] || '';
+                    rowHTML += `
+                        <td class="border border-blue-900 p-0 text-center align-middle">
+                            <div contenteditable="true" inputmode="numeric" class="book-cell w-full h-full min-h-[16px] flex items-center justify-center outline-none focus:bg-yellow-100 text-[10px] font-bold text-blue-800 dark:text-blue-300 transition" data-student="${s.id}" data-subject="${sub.id}" data-type="new" oninput="calcBookTotals()">${vNew}</div>
+                        </td>
+                        <td class="border border-blue-900 p-0 text-center align-middle">
+                            <div contenteditable="true" inputmode="numeric" class="book-cell w-full h-full min-h-[16px] flex items-center justify-center outline-none focus:bg-yellow-100 text-[10px] font-bold text-gray-700 dark:text-gray-300 transition" data-student="${s.id}" data-subject="${sub.id}" data-type="old" oninput="calcBookTotals()">${vOld}</div>
+                        </td>
+                    `;
+                });
+
+                rowHTML += `
+                        <td class="border border-blue-900 p-1 text-center whitespace-nowrap text-[10px] font-bold text-red-600 dark:text-red-400" id="book_total_${s.id}"></td>
+                        <td class="border border-blue-900 p-1 text-[10px]" contenteditable="true"></td>
+                    </tr>
+                `;
+                tbody.innerHTML += rowHTML;
+            });
+
+            let tfootHTML = `<tr><td colspan="3" class="border border-blue-900 p-1 text-right text-[11px] text-red-600 dark:text-red-400 pr-2">សរុប</td>`;
+            bookSubjects.forEach(sub => {
+                tfootHTML += `<td class="border border-blue-900 p-1 text-center text-[10px] text-blue-700 dark:text-blue-400" id="ft_${sub.id}_new"></td>
+                              <td class="border border-blue-900 p-1 text-center text-[10px] text-gray-700 dark:text-gray-300" id="ft_${sub.id}_old"></td>`;
+            });
+            tfootHTML += `<td class="border border-blue-900 p-1 text-center text-[10px] font-bold text-red-600 dark:text-red-400" id="ft_grand_total"></td><td class="border border-blue-900 p-1"></td></tr>`;
+            tfoot.innerHTML = tfootHTML;
+
+            summaryDiv.innerHTML = `បញ្ចប់បញ្ជីត្រឹមចំនួនសិស្ស ${totalStudents} នាក់ ស្រី ${femaleStudents} នាក់`;
+
+            setTimeout(calcBookTotals, 50); 
+        }
+
+        function calcBookTotals() {
+            let colTotals = {};
+            let studentTotals = {};
+            let grandTotal = 0;
+
+            document.querySelectorAll('.book-cell').forEach(cell => {
+                let valText = cell.innerText.replace(/\D/g, '');
+                let val = parseInt(valText) || 0;
+                
+                let studentId = cell.getAttribute('data-student');
+                let key = cell.getAttribute('data-subject') + '_' + cell.getAttribute('data-type');
+                
+                if (val > 0) {
+                    bookBorrowingData[`${studentId}_${key}`] = val;
+                } else {
+                    delete bookBorrowingData[`${studentId}_${key}`];
+                }
+
+                studentTotals[studentId] = (studentTotals[studentId] || 0) + val;
+                colTotals[key] = (colTotals[key] || 0) + val;
+                grandTotal += val;
+            });
+
+            localStorage.setItem('bookBorrowingDataV12', JSON.stringify(bookBorrowingData));
+            // ដូរពី localStorage ទៅ Firebase
+            saveAllDataToFirebase();
+
+            for(let sid in studentTotals) {
+                let el = document.getElementById(`book_total_${sid}`);
+                if(el) el.innerText = studentTotals[sid] > 0 ? studentTotals[sid] + ' ក្បាល' : '';
+            }
+
+            const bookSubjects = subjectList.filter(sub => !['sub_dictation', 'sub_composition', 'sub_reading', 'sub_pe', 'sub_art', 'sub_life'].includes(sub.id));
+            bookSubjects.forEach(sub => {
+                let newEl = document.getElementById(`ft_${sub.id}_new`);
+                let oldEl = document.getElementById(`ft_${sub.id}_old`);
+                let tNew = colTotals[`${sub.id}_new`] || 0;
+                let tOld = colTotals[`${sub.id}_old`] || 0;
+                if(newEl) newEl.innerText = tNew > 0 ? tNew : '';
+                if(oldEl) oldEl.innerText = tOld > 0 ? tOld : '';
+            });
+
+            let gtEl = document.getElementById('ft_grand_total');
+            if(gtEl) gtEl.innerText = grandTotal > 0 ? grandTotal + ' ក្បាល' : '';
+        }
+
+        function updateAdminHeaders() {
+            document.querySelectorAll('.displaySchoolName').forEach(el => el.innerText = schoolInfo.schoolName || 'ឈ្មោះសាលា');
+            document.querySelectorAll('.displayProvince').forEach(el => el.innerText = schoolInfo.province || '............');
+            document.querySelectorAll('.displayClass').forEach(el => el.innerText = schoolInfo.className || '...');
+            document.querySelectorAll('.displayYear').forEach(el => el.innerText = schoolInfo.academicYear || '...');
+        }
+
+        function updateDashboardStats() {
+            document.getElementById('dashboardStudentCount').innerText = students.length;
+            let femaleCount = students.filter(s => s.gender === 'ស្រី (ស)').length;
+            document.getElementById('dashboardRegisterCount').innerHTML = `${students.length}<span class="text-sm ml-1">(ស្រី ${femaleCount})</span>`;
+            
+            const periodId = document.getElementById('periodSelector').value;
+            const periodName = document.getElementById('periodSelector').options[document.getElementById('periodSelector').selectedIndex].text;
+            let denominator = parseFloat(document.getElementById('avgDenominator').value) || 1;
+            
+            let hasScores = students.filter(s => s.records && s.records[periodId] && s.records[periodId].scores);
+            let passed = hasScores.filter(s => {
+                let total = 0;
+                Object.values(s.records[periodId].scores).forEach(val => total += val);
+                return (total / denominator) >= 25;
+            });
+            
+            let passRate = hasScores.length > 0 ? Math.round((passed.length / hasScores.length) * 100) : 0;
+            document.getElementById('dashboardPassRate').innerText = passRate + '%';
+            
+            document.querySelectorAll('.displayPeriodText').forEach(el => {
+                if (!el.closest('#rankDetail')) el.innerText = periodName;
+            });
+            if(document.getElementById('info_period')) document.getElementById('info_period').value = periodName;
+
+            updateAdminHeaders();
+        }
+
+        function renderHonorRoll() {
+            const periodSelector = document.getElementById('periodSelector');
+            const periodId = periodSelector.value;
+            const periodName = periodSelector.options[periodSelector.selectedIndex].text;
+            let denominator = parseFloat(document.getElementById('avgDenominator').value) || 1;
+            
+            const calcResults = processCalculations(periodId, denominator);
+            
+            let rankedStudents = students.filter(s => {
+                let d = calcResults.data.find(x => x.id === s.id);
+                return d && d.hasScores;
+            });
+
+            rankedStudents.sort((a, b) => {
+                let valA = calcResults.data.find(x => x.id === a.id).avg;
+                let valB = calcResults.data.find(x => x.id === b.id).avg;
+                return valB - valA;
+            });
+
+            let top5 = rankedStudents.slice(0, 5);
+
+            const honorHeader = document.getElementById('honorRollDetail');
+            honorHeader.querySelector('.displaySchoolName').innerText = schoolInfo.schoolName || '...';
+            honorHeader.querySelector('.displayTitle').innerText = `${schoolInfo.title || 'តារាងកិត្តិយស'} សម្រាប់${periodName}`;
+            honorHeader.querySelector('.displayClass').innerText = schoolInfo.className || '...';
+            honorHeader.querySelector('.displayYear').innerText = schoolInfo.academicYear || '...';
+
+            const honorTreeContainer = document.getElementById('honorRollTreeContainer');
+            
+            if (top5.length === 0) {
+                honorTreeContainer.innerHTML = '<div class="text-center text-gray-500 py-10">មិនទាន់មានទិន្នន័យពិន្ទុដើម្បីចងក្រងចំណាត់ថ្នាក់ទេ</div>';
+                return;
+            }
+
+            const khmerNums = ['១', '២', '៣', '៤', '៥'];
+
+            function buildNode(student, index) {
+                if (!student) return `<div class="w-40 sm:w-56"></div>`; 
+                let calcData = calcResults.data.find(d => d.id === student.id);
+                let rankNum = khmerNums[index];
+
+                return `
+                <div class="flex flex-col items-center relative mx-2 sm:mx-4 w-[160px] sm:w-[220px] mb-8">
+                    <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-full border-[3px] border-gray-800 dark:border-gray-300 bg-white dark:bg-gray-800 flex items-center justify-center z-10 -mb-6 sm:-mb-8 shadow-sm">
+                        <span class="text-red-600 dark:text-red-400 font-bold text-xl sm:text-2xl">${rankNum}</span>
+                    </div>
+                    <div class="w-full h-20 sm:h-24 border-[3px] border-gray-800 dark:border-gray-300 bg-white dark:bg-gray-800 flex flex-col items-center justify-center pt-6 sm:pt-8 px-2 text-center rounded-sm shadow-md">
+                        <div class="font-bold text-sm sm:text-base text-gray-900 dark:text-gray-100 truncate w-full">${student.name}</div>
+                        <div class="text-xs sm:text-sm text-blue-600 dark:text-blue-400 font-bold mt-1">ពិន្ទុ: ${calcData.total} <span class="text-[10px] font-normal text-gray-500">(${calcData.avg.toFixed(2)})</span></div>
+                    </div>
+                </div>`;
+            }
+
+            honorTreeContainer.innerHTML = `
+                <div class="flex flex-col items-center gap-2 sm:gap-6 mt-6 pb-10">
+                    <div class="flex justify-center w-full">
+                        ${buildNode(top5[0], 0)}
+                    </div>
+                    <div class="flex justify-between w-full max-w-2xl px-4 sm:px-10">
+                        ${buildNode(top5[1], 1)}
+                        ${buildNode(top5[2], 2)}
+                    </div>
+                    <div class="flex justify-between w-full max-w-3xl px-2 sm:px-4 mt-2 sm:mt-6">
+                        ${buildNode(top5[3], 3)}
+                        ${buildNode(top5[4], 4)}
+                    </div>
+                </div>
+            `;
+        }
+
+        function initSchoolInfo() {
+            document.getElementById('info_school').value = schoolInfo.schoolName || '';
+            document.getElementById('info_province').value = schoolInfo.province || ''; 
+            document.getElementById('info_title').value = schoolInfo.title || '';
+            document.getElementById('info_class').value = schoolInfo.className || '';
+            document.getElementById('info_year').value = schoolInfo.academicYear || '';
+            const pSel = document.getElementById('periodSelector');
+            if (pSel) document.getElementById('info_period').value = pSel.options[pSel.selectedIndex].text;
+            
+            const initialPeriod = document.getElementById('periodSelector').value;
+            document.getElementById('avgDenominator').value = periodDenominators[initialPeriod] || 18;
+        }
+
+        function saveSchoolInfo() {
+            schoolInfo.schoolName = document.getElementById('info_school').value.trim() || '';
+            schoolInfo.province = document.getElementById('info_province').value.trim() || ''; 
+            schoolInfo.title = document.getElementById('info_title').value.trim() || '';
+            schoolInfo.className = document.getElementById('info_class').value.trim() || '';
+            schoolInfo.academicYear = document.getElementById('info_year').value.trim() || '';
+            localStorage.setItem('schoolInfoV12', JSON.stringify(schoolInfo));
+            // ដូរពី localStorage ទៅ Firebase
+            saveAllDataToFirebase();
+            
+            const btn = document.getElementById('btnSaveInfo');
+            const originalText = btn.innerText;
+            btn.innerText = '✓ បានរក្សាទុក';
+            btn.classList.replace('bg-blue-600', 'bg-green-600');
+            setTimeout(() => { btn.innerText = originalText; btn.classList.replace('bg-green-600', 'bg-blue-600'); }, 2000);
+            
+            updateAdminHeaders();
+            if (document.getElementById('honorRollDetail').classList.contains('active')) renderHonorRoll();
+            else if (document.getElementById('tableDetail').classList.contains('active') || document.getElementById('rankDetail').classList.contains('active')) renderTable();
+            else if (document.getElementById('reportDetail').classList.contains('active')) {
+                if(document.getElementById('tab_annual_report').classList.contains('active')) renderAnnualReport();
+                else renderReport();
+            }
+        }
+
+        function buildUI() {
+            const inputsContainer = document.getElementById('subjectInputsContainer');
+            let inputsHTML = '';
+            subjectList.forEach(sub => {
+                inputsHTML += `<div><label class="block text-[11px] sm:text-xs font-bold text-gray-700 dark:text-gray-300 truncate mb-1">${sub.name}</label><input type="number" id="score_${sub.id}" class="w-full p-2.5 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 rounded-md focus:ring-2 focus:ring-blue-400 outline-none text-sm font-bold text-blue-800 dark:text-blue-300" placeholder="0"></div>`;
+            });
+            inputsContainer.innerHTML = inputsHTML;
+
+            const headerContainer = document.getElementById('tableHeaders');
+            let headersHTML = `<th class="px-2 py-3 text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-200 dark:bg-gray-700 text-center w-10 border border-gray-300 dark:border-gray-600">ល.រ</th><th class="px-3 py-3 text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-200 dark:bg-gray-700 min-w-[120px] border border-gray-300 dark:border-gray-600">ឈ្មោះ</th><th class="px-2 py-3 text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-200 dark:bg-gray-700 text-center border border-gray-300 dark:border-gray-600">ភេទ</th>`;
+            subjectList.forEach(sub => {
+                headersHTML += `<th class="bg-blue-50 dark:bg-gray-800 align-bottom p-0 min-w-[36px] sm:min-w-[40px] border border-gray-300 dark:border-gray-600"><div class="vertical-text text-blue-900 dark:text-blue-300 font-bold text-[12px] sm:text-[13px] mx-auto">${sub.name}</div></th>`;
+            });
+            headersHTML += `<th class="px-2 py-2 text-sm font-bold text-gray-800 dark:text-gray-100 bg-yellow-100 dark:bg-yellow-900/40 text-center border border-gray-300 dark:border-gray-600">សរុប</th><th class="px-2 py-2 text-sm font-bold text-gray-800 dark:text-gray-100 bg-yellow-100 dark:bg-yellow-900/40 text-center border border-gray-300 dark:border-gray-600">ចំណាត់ថ្នាក់</th><th class="px-2 py-2 text-sm font-bold text-gray-800 dark:text-gray-100 bg-yellow-100 dark:bg-yellow-900/40 text-center border border-gray-300 dark:border-gray-600">មធ្យមភាគ</th><th class="px-2 py-2 text-sm font-bold text-gray-800 dark:text-gray-100 bg-yellow-100 dark:bg-yellow-900/40 text-center border border-gray-300 dark:border-gray-600">និទ្ទេស</th><th class="action-col px-4 py-2 text-sm font-bold text-gray-700 dark:text-gray-200 bg-gray-200 dark:bg-gray-700 text-center border border-gray-300 dark:border-gray-600">សកម្មភាព</th>`;
+            headerContainer.innerHTML = headersHTML;
+            
+            // Set initial denominator
+            const initialPeriod = document.getElementById('periodSelector').value;
+            document.getElementById('avgDenominator').value = periodDenominators[initialPeriod] || 18;
+        }
+
+        function saveData() { localStorage.setItem('studentDataV12', JSON.stringify(students)); }
+        // ៤. អនុគមន៍ថ្មីសម្រាប់រក្សាទុកទិន្នន័យទាំងអស់ទៅកាន់ Firebase ពេលមានការកែប្រែ
+        function saveAllDataToFirebase() {
+            db.collection("schoolApp").doc("mainData").set({
+                students: students,
+                schoolInfo: schoolInfo,
+                scheduleData: scheduleData,
+                seatingData: seatingData,
+                bookBorrowingData: bookBorrowingData,
+                periodDenominators: periodDenominators
+            }).catch((error) => {
+                console.error("Error saving document: ", error);
+            });
+        }
+
+        function importFromExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+                    let importedCount = 0;
+                    jsonData.forEach(row => {
+                        const getVal = (keys) => {
+                            for(let k in row) if(keys.includes(k.trim().toLowerCase())) return row[k];
+                            return null;
+                        };
+                        const name = getVal(["ឈ្មោះ", "name", "ឈ្មោះសិស្ស", "student name"]);
+                        let gender = getVal(["ភេទ", "gender", "sex"]);
+                        const dob = getVal(["ថ្ងៃខែឆ្នាំកំណើត", "ថ្ងៃខែឆ្នាំ", "dob", "date of birth"]);
+
+                        if (name) {
+                            if(gender) {
+                                let gLower = gender.toString().toLowerCase().trim();
+                                if(gLower === 'ស្រី' || gLower === 'ស' || gLower === 'f' || gLower === 'female') gender = "ស្រី (ស)";
+                                else gender = "ប្រុស (ប)";
+                            } else gender = "ប្រុស (ប)";
+
+                            students.push({ id: Date.now() + Math.random(), name: name.toString().trim(), gender: gender, dob: dob ? dob.toString() : '', records: {} });
+                            importedCount++;
+                        }
+                    });
+
+                    if (importedCount > 0) {
+                        students.sort((a, b) => a.name.localeCompare(b.name, 'km'));
+                        saveData(); 
+                        saveAllDataToFirebase(); 
+                        renderTable();
+                        updateDashboardStats();
+                        if(document.getElementById('classAdminDetail').classList.contains('active')) {
+                            renderAdminStudentList();
+                            renderCleaningSchedule();
+                            renderSeatingPlan();
+                        }
+                        alert(`🎉 បានទាញយកឈ្មោះសិស្សចំនួន ${importedCount} នាក់ដោយជោគជ័យ។`);
+                        if(document.getElementById('registerDetail').classList.contains('active')) showDetail('tableDetail');
+                    } else alert("⚠️ រកមិនឃើញទិន្នន័យត្រឹមត្រូវទេ។");
+                } catch (error) { alert("មានបញ្ហាក្នុងការអានឯកសារ Excel។"); }
+                event.target.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function saveStudentRegistration() {
+            const name = document.getElementById('reg_name').value.trim();
+            const gender = document.getElementById('reg_gender').value;
+            const dob = document.getElementById('reg_dob').value;
+            
+            const father_name = document.getElementById('reg_father_name').value.trim();
+            const father_job = document.getElementById('reg_father_job').value.trim();
+            const mother_name = document.getElementById('reg_mother_name').value.trim();
+            const mother_job = document.getElementById('reg_mother_job').value.trim();
+            
+            const curr_village = document.getElementById('reg_curr_village').value.trim();
+            const curr_commune = document.getElementById('reg_curr_commune').value.trim();
+            const curr_district = document.getElementById('reg_curr_district').value.trim();
+            const curr_province = document.getElementById('reg_curr_province').value.trim();
+            
+            const phone = document.getElementById('reg_phone').value.trim();
+            const transfer_from = document.getElementById('reg_transfer_from').value.trim();
+            const family_status = document.getElementById('reg_family_status').value;
+
+            if (!name) { alert("សូមបញ្ចូលឈ្មោះសិស្សយ៉ាងហោចណាស់!"); return; }
+
+            const studentData = {
+                name, gender, dob,
+                father_name, father_job, mother_name, mother_job,
+                curr_village, curr_commune, curr_district, curr_province,
+                phone, transfer_from, family_status
+            };
+
+            if (editingStudentId) {
+                let student = students.find(s => s.id === editingStudentId);
+                if(student) Object.assign(student, studentData);
+            } else {
+                students.push({ id: Date.now(), records: {}, ...studentData });
+            }
+
+            students.sort((a, b) => a.name.localeCompare(b.name, 'km'));
+            saveData(); 
+            saveAllDataToFirebase(); 
+            cancelRegister(); 
+            updateDashboardStats();
+            showDetail('tableDetail');
+        }
+
+        function editStudentInfo(id) {
+            const student = students.find(s => s.id === id);
+            if (!student) return;
+            
+            document.getElementById('reg_name').value = student.name || '';
+            document.getElementById('reg_gender').value = student.gender || 'ប្រុស (ប)';
+            document.getElementById('reg_dob').value = student.dob || '';
+            
+            document.getElementById('reg_father_name').value = student.father_name || '';
+            document.getElementById('reg_father_job').value = student.father_job || '';
+            document.getElementById('reg_mother_name').value = student.mother_name || '';
+            document.getElementById('reg_mother_job').value = student.mother_job || '';
+            
+            document.getElementById('reg_curr_village').value = student.curr_village || '';
+            document.getElementById('reg_curr_commune').value = student.curr_commune || '';
+            document.getElementById('reg_curr_district').value = student.curr_district || '';
+            document.getElementById('reg_curr_province').value = student.curr_province || '';
+            
+            document.getElementById('reg_phone').value = student.phone || '';
+            document.getElementById('reg_transfer_from').value = student.transfer_from || '';
+            document.getElementById('reg_family_status').value = student.family_status || '';
+
+            editingStudentId = id;
+            document.getElementById('regFormTitle').innerText = "កែប្រែព័ត៌មានសិស្ស";
+            document.getElementById('btnCancelReg').classList.remove('hidden');
+            showDetail('registerDetail');
+        }
+
+        function cancelRegister() {
+            editingStudentId = null;
+            
+            const fields = [
+                'reg_name', 'reg_dob', 
+                'reg_father_name', 'reg_father_job', 'reg_mother_name', 'reg_mother_job',
+                'reg_curr_village', 'reg_curr_commune', 'reg_curr_district', 'reg_curr_province',
+                'reg_phone', 'reg_transfer_from', 'reg_family_status'
+            ];
+            
+            fields.forEach(f => {
+                let el = document.getElementById(f);
+                if(el) el.value = '';
+            });
+            document.getElementById('reg_gender').value = 'ប្រុស (ប)';
+            
+            document.getElementById('regFormTitle').innerText = "២. ចុះឈ្មោះសិស្សថ្មីចូលបញ្ជី (ព័ត៌មានលម្អិត)";
+            document.getElementById('btnCancelReg').classList.add('hidden');
+        }
+
+        function deleteStudent(id) {
+            if(confirm("តើអ្នកពិតជាចង់លុបសិស្សនេះមែនទេ?")) {
+                let studentToRestore = students.find(s => s.id === id);
+                let seatingToRestore = {};
+                
+                students = students.filter(s => s.id !== id);
+                
+                for (let key in seatingData) {
+                    if (seatingData[key] == id) {
+                        seatingToRestore[key] = id;
+                        seatingData[key] = "";
+                    }
+                }
+                
+                deletedHistory.push({ student: JSON.parse(JSON.stringify(studentToRestore)), seating: seatingToRestore });
+                
+                localStorage.setItem('seatingDataV12', JSON.stringify(seatingData));
+
+                saveData(); 
+                saveAllDataToFirebase(); 
+                refreshData();
+                showUndoToast(studentToRestore.name);
+            }
+        }
+
+        function showUndoToast(name) {
+            const toast = document.getElementById('undoToast');
+            document.getElementById('undoMessage').innerText = `បានលុបសិស្ស: ${name}`;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(hideUndoToast, 10000);
+        }
+
+        function hideUndoToast() {
+            const toast = document.getElementById('undoToast');
+            if(toast) toast.classList.add('translate-y-20', 'opacity-0');
+        }
+
+        function undoDelete() {
+            if (deletedHistory.length === 0) return;
+            const historyItem = deletedHistory.pop();
+            
+            students.push(historyItem.student);
+            students.sort((a, b) => a.name.localeCompare(b.name, 'km'));
+            
+            for(let key in historyItem.seating) {
+                seatingData[key] = historyItem.seating[key];
+            }
+            
+            localStorage.setItem('seatingDataV12', JSON.stringify(seatingData));
+            saveData();
+            saveAllDataToFirebase();
+            refreshData();
+            hideUndoToast();
+        }
+
+        function openScoreForm(studentId) {
+            const student = students.find(s => s.id === studentId);
+            if(!student) return;
+            currentScoringStudentId = studentId;
+            const periodId = document.getElementById('periodSelector').value;
+            const periodName = document.getElementById('periodSelector').options[document.getElementById('periodSelector').selectedIndex].text;
+            
+            document.getElementById('scoreStudentName').innerText = student.name;
+            document.getElementById('scorePeriodLabel').innerText = periodName;
+
+            let currentScores = (student.records && student.records[periodId] && student.records[periodId].scores) ? student.records[periodId].scores : {};
+            subjectList.forEach(sub => { document.getElementById(`score_${sub.id}`).value = currentScores[sub.id] !== undefined ? currentScores[sub.id] : ''; });
+            showDetail('scoreTab');
+        }
+
+        function saveScores() {
+            if(!currentScoringStudentId) return;
+            const student = students.find(s => s.id === currentScoringStudentId);
+            const periodId = document.getElementById('periodSelector').value;
+            let scores = {};
+            subjectList.forEach(sub => {
+                let valStr = document.getElementById(`score_${sub.id}`).value;
+                if(valStr !== "") scores[sub.id] = parseFloat(valStr);
+            });
+            if(!student.records) student.records = {};
+            student.records[periodId] = { scores: scores };
+            saveData(); 
+            saveAllDataToFirebase(); 
+            updateDashboardStats();
+            showDetail('tableDetail');
+        }
+
+        function getGrade(avg) {
+            let kh = '', en = '', color = '';
+            
+            if (avg >= 45) en = 'A';
+            else if (avg >= 40) en = 'B';
+            else if (avg >= 35) en = 'C';
+            else if (avg >= 30) en = 'D';
+            else if (avg >= 25) en = 'E';
+            else if (avg >= 0.01) en = 'F';
+            else en = 'មិនចាត់ថ្នាក់';
+
+            if (avg >= 40) {
+                kh = 'ល្អ';
+                color = 'text-green-600 dark:text-green-400';
+            } else if (avg >= 32.50) {
+                kh = 'ល្អបង្គួរ';
+                color = 'text-blue-600 dark:text-blue-400';
+            } else if (avg >= 25) {
+                kh = 'មធ្យម';
+                color = 'text-yellow-600 dark:text-yellow-400';
+            } else if (avg >= 0.01) {
+                kh = 'ខ្សោយ';
+                color = 'text-orange-500 dark:text-orange-400';
+            } else {
+                kh = 'មិនចាត់ថ្នាក់';
+                color = 'text-red-600 dark:text-red-400';
+            }
+
+            return { label: `${kh} (${en})`, kh: kh, en: en, color: color };
+        }
+
+        function processCalculations(periodId, denominator) {
+            let processedData = [];
+            students.forEach(s => {
+                let rec = (s.records && s.records[periodId]) ? s.records[periodId] : null;
+                let total = 0; let hasScores = false;
+                if(rec && rec.scores) { Object.values(rec.scores).forEach(val => { total += val; hasScores = true; }); }
+                let baseAvg = hasScores ? (total / denominator) : 0;
+                let finalAvg = baseAvg;
+
+                // រូបមន្តគណនាមធ្យមភាគប្រចាំឆមាស
+                if (periodId === 'sem1' || periodId === 'sem2') {
+                    let monthsToProcess = periodId === 'sem1' ? ['nov', 'dec', 'jan', 'feb', 'mar'] : ['apr', 'may', 'jun', 'jul', 'aug', 'sep'];
+                    let validMonths = 0;
+                    let sumMonthlyAvgs = 0;
+                    monthsToProcess.forEach(m => {
+                        let mRec = (s.records && s.records[m]) ? s.records[m] : null;
+                        if (mRec && mRec.scores && Object.keys(mRec.scores).length > 0) {
+                            let mTotal = 0;
+                            Object.values(mRec.scores).forEach(v => mTotal += v);
+                            let mDenom = periodDenominators[m] || 18; // ទាញយកមេគុណខែនីមួយៗ
+                            sumMonthlyAvgs += (mTotal / mDenom);
+                            validMonths++;
+                        }
+                    });
+                    let monthlyAvg = validMonths > 0 ? (sumMonthlyAvgs / validMonths) : 0;
+                    if (hasScores && validMonths > 0) finalAvg = (monthlyAvg + baseAvg) / 2;
+                }
+
+                processedData.push({ id: s.id, hasScores, scores: hasScores ? rec.scores : {}, total, avg: finalAvg, grade: getGrade(finalAvg) });
+            });
+
+            let ranks = {};
+            students.forEach(s => ranks[s.id] = { total: '-', subjects: {} });
+            let activeStudents = processedData.filter(s => s.hasScores);
+            
+            let sortedByAvg = [...activeStudents].sort((a, b) => b.avg - a.avg);
+            let currentTotalRank = 1;
+            sortedByAvg.forEach((s, idx) => {
+                if (idx > 0 && s.avg === sortedByAvg[idx-1].avg) ranks[s.id].total = ranks[sortedByAvg[idx-1].id].total;
+                else ranks[s.id].total = currentTotalRank;
+                currentTotalRank++;
+            });
+
+            subjectList.forEach(sub => {
+                let sortedBySub = [...activeStudents].sort((a, b) => (b.scores[sub.id] || 0) - (a.scores[sub.id] || 0));
+                let currentSubRank = 1;
+                sortedBySub.forEach((s, idx) => {
+                    let val = s.scores[sub.id] || 0;
+                    if(val === 0) { ranks[s.id].subjects[sub.id] = "-"; }
+                    else if (idx > 0 && val === (sortedBySub[idx-1].scores[sub.id] || 0)) ranks[s.id].subjects[sub.id] = ranks[sortedBySub[idx-1].id].subjects[sub.id];
+                    else ranks[s.id].subjects[sub.id] = currentSubRank;
+                    if(val > 0) currentSubRank++;
+                });
+            });
+
+            return { data: processedData, ranks: ranks };
+        }
+
+        function renderReport() {
+            updateAdminHeaders(); 
+
+            const periodId = document.getElementById('periodSelector').value;
+            let denominator = parseFloat(document.getElementById('avgDenominator').value) || 1;
+            const calcResults = processCalculations(periodId, denominator);
+
+            let totalSt = students.length;
+            let totalFemale = students.filter(s => s.gender === 'ស្រី (ស)').length;
+
+            let statsKh = { 'ល្អ': {t:0, f:0}, 'ល្អបង្គួរ': {t:0, f:0}, 'មធ្យម': {t:0, f:0}, 'ខ្សោយ': {t:0, f:0}, 'មិនចាត់ថ្នាក់': {t:0, f:0} };
+            let statsEn = { 'A': {t:0, f:0}, 'B': {t:0, f:0}, 'C': {t:0, f:0}, 'D': {t:0, f:0}, 'E': {t:0, f:0}, 'F': {t:0, f:0} };
+
+            students.forEach(s => {
+                let isF = s.gender === 'ស្រី (ស)';
+                let d = calcResults.data.find(x => x.id === s.id);
+
+                if(d && d.hasScores) {
+                    if (statsKh[d.grade.kh]) {
+                        statsKh[d.grade.kh].t++;
+                        if (isF) statsKh[d.grade.kh].f++;
+                    }
+                    if (statsEn[d.grade.en]) {
+                        statsEn[d.grade.en].t++;
+                        if (isF) statsEn[d.grade.en].f++;
+                    }
+                } else {
+                    statsKh['មិនចាត់ថ្នាក់'].t++;
+                    if (isF) statsKh['មិនចាត់ថ្នាក់'].f++;
+                }
+            });
+
+            const getP = (val) => totalSt > 0 ? ((val / totalSt) * 100).toFixed(2) + '%' : '0.00%';
+
+            let tbody1 = document.getElementById('reportTable1Body');
+            tbody1.innerHTML = `
+                <tr>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">1</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${totalSt} នាក់</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${totalFemale} នាក់</td>
+                    
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['ល្អ'].t}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['ល្អ'].f}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2 text-red-600 dark:text-red-400">${getP(statsKh['ល្អ'].t)}</td>
+                    
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['ល្អបង្គួរ'].t}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['ល្អបង្គួរ'].f}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2 text-red-600 dark:text-red-400">${getP(statsKh['ល្អបង្គួរ'].t)}</td>
+                    
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['មធ្យម'].t}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['មធ្យម'].f}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2 text-red-600 dark:text-red-400">${getP(statsKh['មធ្យម'].t)}</td>
+                    
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['ខ្សោយ'].t}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['ខ្សោយ'].f}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2 text-red-600 dark:text-red-400">${getP(statsKh['ខ្សោយ'].t)}</td>
+                    
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['មិនចាត់ថ្នាក់'].t}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['មិនចាត់ថ្នាក់'].f}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2 text-red-600 dark:text-red-400">${getP(statsKh['មិនចាត់ថ្នាក់'].t)}</td>
+                    
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">0</td>
+                </tr>
+                <tr class="bg-blue-50/50 dark:bg-gray-800/50 text-red-600 dark:text-red-400">
+                    <td class="border border-blue-900 dark:border-blue-400 p-2" colspan="3">សរុប</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['ល្អ'].t}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['ល្អ'].f}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${getP(statsKh['ល្អ'].t)}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['ល្អបង្គួរ'].t}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['ល្អបង្គួរ'].f}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${getP(statsKh['ល្អបង្គួរ'].t)}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['មធ្យម'].t}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['មធ្យម'].f}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${getP(statsKh['មធ្យម'].t)}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['ខ្សោយ'].t}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['ខ្សោយ'].f}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${getP(statsKh['ខ្សោយ'].t)}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['មិនចាត់ថ្នាក់'].t}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${statsKh['មិនចាត់ថ្នាក់'].f}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${getP(statsKh['មិនចាត់ថ្នាក់'].t)}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2"></td>
+                </tr>
+            `;
+
+            let tbody2 = document.getElementById('reportTable2Body');
+            tbody2.innerHTML = `
+                <tr>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">1</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2 text-left">${schoolInfo.schoolName || '...'}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${totalSt}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${totalFemale}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">00</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">00</td>
+                    
+                    <td class="border border-blue-900 dark:border-blue-400 p-2 text-blue-700 dark:text-blue-400">${String(statsEn['A'].t).padStart(2, '0')}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['A'].f).padStart(2, '0')}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2 text-blue-700 dark:text-blue-400">${String(statsEn['B'].t).padStart(2, '0')}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['B'].f).padStart(2, '0')}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2 text-blue-700 dark:text-blue-400">${String(statsEn['C'].t).padStart(2, '0')}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['C'].f).padStart(2, '0')}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2 text-blue-700 dark:text-blue-400">${String(statsEn['D'].t).padStart(2, '0')}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['D'].f).padStart(2, '0')}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2 text-blue-700 dark:text-blue-400">${String(statsEn['E'].t).padStart(2, '0')}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['E'].f).padStart(2, '0')}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2 text-blue-700 dark:text-blue-400">${String(statsEn['F'].t).padStart(2, '0')}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['F'].f).padStart(2, '0')}</td>
+                    
+                    <td class="border border-blue-900 dark:border-blue-400 p-2"></td>
+                </tr>
+                <tr class="bg-blue-50/50 dark:bg-gray-800/50 text-red-600 dark:text-red-400">
+                    <td class="border border-blue-900 dark:border-blue-400 p-2" colspan="2">សរុប</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${totalSt}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${totalFemale}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">00</td><td class="border border-blue-900 dark:border-blue-400 p-2">00</td>
+                    
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['A'].t).padStart(2, '0')}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['A'].f).padStart(2, '0')}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['B'].t).padStart(2, '0')}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['B'].f).padStart(2, '0')}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['C'].t).padStart(2, '0')}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['C'].f).padStart(2, '0')}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['D'].t).padStart(2, '0')}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['D'].f).padStart(2, '0')}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['E'].t).padStart(2, '0')}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['E'].f).padStart(2, '0')}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['F'].t).padStart(2, '0')}</td><td class="border border-blue-900 dark:border-blue-400 p-2">${String(statsEn['F'].f).padStart(2, '0')}</td>
+                    <td class="border border-blue-900 dark:border-blue-400 p-2"></td>
+                </tr>
+            `;
+        }
+
+        function renderAnnualReport() {
+            updateAdminHeaders(); 
+
+            let denomSem1 = periodDenominators['sem1'] || 18;
+            let denomSem2 = periodDenominators['sem2'] || 18;
+            const calcSem1 = processCalculations('sem1', denomSem1);
+            const calcSem2 = processCalculations('sem2', denomSem2);
+            
+            let annualData = [];
+            students.forEach(s => {
+                let s1 = calcSem1.data.find(d => d.id === s.id);
+                let s2 = calcSem2.data.find(d => d.id === s.id);
+                
+                let avg1 = (s1 && s1.hasScores) ? s1.avg : 0;
+                let avg2 = (s2 && s2.hasScores) ? s2.avg : 0;
+                
+                let annualAvg = (avg1 + avg2) / 2; 
+                let hasAnyScore = (s1 && s1.hasScores) || (s2 && s2.hasScores);
+                
+                annualData.push({
+                    id: s.id, name: s.name, gender: s.gender,
+                    avg1: avg1, avg2: avg2, annualAvg: annualAvg,
+                    hasAnyScore: hasAnyScore, grade: getGrade(annualAvg)
+                });
+            });
+
+            annualData.sort((a, b) => b.annualAvg - a.annualAvg);
+            let ranks = {};
+            let currentRank = 1;
+            annualData.forEach((s, idx) => {
+                if (!s.hasAnyScore) {
+                    ranks[s.id] = '-';
+                } else {
+                    if (idx > 0 && s.annualAvg === annualData[idx-1].annualAvg) {
+                        ranks[s.id] = ranks[annualData[idx-1].id];
+                    } else {
+                        ranks[s.id] = currentRank;
+                    }
+                    currentRank++;
+                }
+            });
+
+            let tbody = document.getElementById('annualReportTableBody');
+            tbody.innerHTML = '';
+            
+            let stats = {
+                total: 0, totalF: 0,
+                pass: 0, passF: 0,
+                good: 0, goodF: 0,
+                fair: 0, fairF: 0,
+                avg: 0, avgF: 0,
+                poor: 0, poorF: 0,
+                unranked: 0, unrankedF: 0
+            };
+
+            annualData.forEach((s, idx) => {
+                let isF = s.gender === 'ស្រី (ស)';
+                stats.total++;
+                if (isF) stats.totalF++;
+
+                if (s.hasAnyScore) {
+                    if (s.annualAvg >= 25) {
+                        stats.pass++;
+                        if (isF) stats.passF++;
+                    }
+
+                    if (s.grade.kh === 'ល្អ') { stats.good++; if(isF) stats.goodF++; }
+                    else if (s.grade.kh === 'ល្អបង្គួរ') { stats.fair++; if(isF) stats.fairF++; }
+                    else if (s.grade.kh === 'មធ្យម') { stats.avg++; if(isF) stats.avgF++; }
+                    else if (s.grade.kh === 'ខ្សោយ') { stats.poor++; if(isF) stats.poorF++; }
+                    else { stats.unranked++; if(isF) stats.unrankedF++; }
+                } else {
+                    stats.unranked++; if(isF) stats.unrankedF++;
+                }
+
+                let dispAvg1 = (s.avg1 > 0) ? s.avg1.toFixed(2) : '-';
+                let dispAvg2 = (s.avg2 > 0) ? s.avg2.toFixed(2) : '-';
+                let dispAnnualAvg = s.hasAnyScore ? s.annualAvg.toFixed(2) : '-';
+                let dispRank = s.hasAnyScore ? ranks[s.id] : '-';
+                let dispGrade = s.hasAnyScore ? `<span class="${s.grade.color}">${s.grade.kh}</span>` : '-';
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-blue-50 dark:hover:bg-gray-700">
+                        <td class="border border-blue-900 dark:border-blue-400 p-2">${idx + 1}</td>
+                        <td class="border border-blue-900 dark:border-blue-400 p-2"></td>
+                        <td class="border border-blue-900 dark:border-blue-400 p-2 text-left font-bold whitespace-nowrap">${s.name}</td>
+                        <td class="border border-blue-900 dark:border-blue-400 p-2">${s.gender === 'ប្រុស (ប)' ? 'ប' : 'ស'}</td>
+                        <td class="border border-blue-900 dark:border-blue-400 p-2 font-bold">${dispAvg1}</td>
+                        <td class="border border-blue-900 dark:border-blue-400 p-2 font-bold">${dispAvg2}</td>
+                        <td class="border border-blue-900 dark:border-blue-400 p-2 font-bold text-red-600 dark:text-red-400">${dispAnnualAvg}</td>
+                        <td class="border border-blue-900 dark:border-blue-400 p-2 font-bold text-blue-700 dark:text-blue-400">${dispRank}</td>
+                        <td class="border border-blue-900 dark:border-blue-400 p-2 font-bold">${dispGrade}</td>
+                        <td class="border border-blue-900 dark:border-blue-400 p-2"></td>
+                    </tr>
+                `;
+            });
+
+            const getP = (val) => stats.total > 0 ? ((val / stats.total) * 100).toFixed(2) + '%' : '0%';
+
+            let summaryBody = document.getElementById('annualSummaryBody');
+            summaryBody.innerHTML = `
+                <tr>
+                    <td colspan="2" class="p-2 border border-blue-900 dark:border-blue-400 font-bold">-បញ្ចប់បញ្ជីត្រឹមចំនួនសិស្ស ${stats.total}នាក់ ស្រី ${stats.totalF}នាក់</td>
+                </tr>
+                <tr>
+                    <td class="p-2 border border-blue-900 dark:border-blue-400 w-1/2">-បានប្រឡងជាប់ សរុប: ${stats.pass}នាក់ ស្រី ${stats.passF}នាក់ ស្មើនឹង ${getP(stats.pass)}</td>
+                    <td class="p-2 border border-blue-900 dark:border-blue-400 w-1/2">-និទ្ទេសមធ្យម សរុប: ${stats.avg}នាក់ ស្រី ${stats.avgF}នាក់ ស្មើនឹង ${getP(stats.avg)}</td>
+                </tr>
+                <tr>
+                    <td class="p-2 border border-blue-900 dark:border-blue-400">-និទ្ទេសល្អ សរុប: ${stats.good}នាក់ ស្រី ${stats.goodF}នាក់ ស្មើនឹង ${getP(stats.good)}</td>
+                    <td class="p-2 border border-blue-900 dark:border-blue-400">-និទ្ទេសខ្សោយ សរុប: ${stats.poor}នាក់ ស្រី ${stats.poorF}នាក់ ស្មើនឹង ${getP(stats.poor)}</td>
+                </tr>
+                <tr>
+                    <td class="p-2 border border-blue-900 dark:border-blue-400">-និទ្ទេសល្អបង្គួរ សរុប: ${stats.fair}នាក់ ស្រី ${stats.fairF}នាក់ ស្មើនឹង ${getP(stats.fair)}</td>
+                    <td class="p-2 border border-blue-900 dark:border-blue-400">-គ្មានចំណាត់ថ្នាក់ សរុប: ${stats.unranked}នាក់ ស្រី ${stats.unrankedF}នាក់ ស្មើនឹង ${getP(stats.unranked)}</td>
+                </tr>
+            `;
+        }
+
+        function switchRankTab(tab) {
+            document.querySelectorAll('#rankDetail .tab-btn').forEach(el => el.classList.remove('active'));
+            const btn = document.getElementById('btn_rank_' + tab);
+            if (btn) btn.classList.add('active');
+            
+            currentRankTab = tab;
+            renderRankTable();
+        }
+
+        function renderTable() {
+            const periodSelector = document.getElementById('periodSelector');
+            const periodId = periodSelector.value;
+            const periodName = periodSelector.options[periodSelector.selectedIndex].text;
+            
+            updateAdminHeaders();
+            document.querySelectorAll('.displayTitle').forEach(el => {
+                if (!el.closest('#rankDetail')) {
+                    el.innerText = `${schoolInfo.title || 'បញ្ជីស្រង់ពិន្ទុ'} សម្រាប់${periodName}`;
+                }
+            });
+            let denominator = parseFloat(document.getElementById('avgDenominator').value);
+            if(isNaN(denominator) || denominator <= 0) denominator = 1;
+
+            const calcResults = processCalculations(periodId, denominator);
+            
+            const list = document.getElementById('studentList');
+            const emptyState = document.getElementById('emptyState');
+            const searchQuery = document.getElementById('searchInput').value.toLowerCase();
+            list.innerHTML = '';
+            
+            let filteredStudents = students;
+            if(searchQuery) filteredStudents = students.filter(s => s.name.toLowerCase().includes(searchQuery));
+
+            const totalCount = filteredStudents.length;
+            const femaleCount = filteredStudents.filter(s => s.gender === 'ស្រី (ស)').length;
+            document.getElementById('statsBadge').innerHTML = `<span class="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 px-3 py-1 rounded-full border border-blue-200 dark:border-blue-700">សរុប៖ ${totalCount} នាក់</span><span class="bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-100 px-3 py-1 rounded-full border border-pink-200 dark:border-pink-700">ស្រី៖ ${femaleCount} នាក់</span>`;
+
+            if (filteredStudents.length === 0) emptyState.classList.remove('hidden');
+            else {
+                emptyState.classList.add('hidden');
+                filteredStudents.forEach((s, index) => {
+                    let calcData = calcResults.data.find(d => d.id === s.id);
+                    let sRanks = calcResults.ranks[s.id];
+                    let scoresHTML = '';
+                    subjectList.forEach(sub => {
+                        let score = calcData.scores[sub.id] !== undefined ? calcData.scores[sub.id] : '';
+                        let subRank = sRanks.subjects[sub.id] || "-";
+                        let rankHtml = (score !== '' && subRank !== "-") ? `<div class="text-[10px] text-red-600 dark:text-red-400 font-bold mt-0.5">ល.${subRank}</div>` : '';
+                        scoresHTML += `<td class="px-1 py-2 text-center bg-white dark:bg-gray-800 min-w-[36px] sm:min-w-[40px] border border-gray-300 dark:border-gray-600"><div class="text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-100">${score}</div>${rankHtml}</td>`;
+                    });
+
+                    let displayTotal = calcData.hasScores ? calcData.total : '-';
+                    let displayAvg = calcData.hasScores ? calcData.avg.toFixed(2) : '-';
+                    let displayGrade = calcData.hasScores ? `<span class="${calcData.grade.color} px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-bold">${calcData.grade.kh}</span>` : '-';
+                    let displayRank = calcData.hasScores ? sRanks.total : '-';
+
+                    list.innerHTML += `
+                        <tr class="hover:bg-blue-50 dark:hover:bg-gray-700 transition">
+                            <td class="px-2 py-3 text-center text-xs sm:text-sm font-bold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600">${index + 1}</td>
+                            <td class="px-2 sm:px-3 py-3 font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-xs sm:text-sm">${s.name}</td>
+                            <td class="px-1 sm:px-2 py-3 text-center text-[10px] sm:text-xs text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">${s.gender}</td>
+                            ${scoresHTML}
+                            <td class="px-1 sm:px-2 py-3 text-center font-bold text-blue-900 dark:text-blue-300 bg-yellow-50 dark:bg-yellow-900/20 border border-gray-300 dark:border-gray-600 text-sm sm:text-base">${displayTotal}</td>
+                            <td class="px-1 sm:px-2 py-3 text-center font-bold text-red-600 dark:text-red-400 bg-yellow-50 dark:bg-yellow-900/20 border border-gray-300 dark:border-gray-600 text-sm sm:text-base">${displayRank}</td>
+                            <td class="px-1 sm:px-2 py-3 text-center font-bold text-blue-700 dark:text-blue-400 bg-yellow-50 dark:bg-yellow-900/20 border border-gray-300 dark:border-gray-600 text-xs sm:text-sm">${displayAvg}</td>
+                            <td class="px-1 sm:px-2 py-3 text-center bg-yellow-50 dark:bg-yellow-900/20 border border-gray-300 dark:border-gray-600">${displayGrade}</td>
+                            <td class="action-col px-2 py-2 text-center whitespace-nowrap bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600">
+                                <button onclick="openScoreForm(${s.id})" class="text-white bg-green-500 hover:bg-green-600 font-bold text-[10px] sm:text-[12px] px-2 sm:px-3 py-1.5 rounded shadow-sm transition mb-1 sm:mb-0 sm:mr-1 block sm:inline-block w-full sm:w-auto">ពិន្ទុ</button>
+                                <button onclick="editStudentInfo(${s.id})" class="text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 font-bold text-[10px] sm:text-[12px] px-2 py-1.5 rounded border border-blue-200 dark:border-blue-700 transition">កែ</button>
+                                <button onclick="deleteStudent(${s.id})" class="text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 font-bold text-[10px] sm:text-[12px] px-2 py-1.5 rounded border border-red-200 dark:border-red-700 transition ml-1">លុប</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            renderRankTable();
+        }
+
+        function renderRankTable() {
+            let periodId = document.getElementById('periodSelector').value;
+            let denominator = parseFloat(document.getElementById('avgDenominator').value) || 1;
+            let periodName = document.getElementById('periodSelector').options[document.getElementById('periodSelector').selectedIndex].text;
+
+            if (currentRankTab === 'sem1') {
+                periodId = 'sem1';
+                denominator = periodDenominators['sem1'] || 18;
+                periodName = 'ប្រឡងឆមាសទី១';
+            } else if (currentRankTab === 'sem2') {
+                periodId = 'sem2';
+                denominator = periodDenominators['sem2'] || 18;
+                periodName = 'ប្រឡងឆមាសទី២';
+            } else if (currentRankTab === 'annual') {
+                renderAnnualRankTable();
+                return;
+            }
+
+            document.getElementById('standardRankContainer').style.display = 'block';
+            let annualContainer = document.getElementById('annualRankContainer');
+            if (annualContainer) annualContainer.style.display = 'none';
+
+            const rankHeader = document.querySelector('#rankDetail .displayTitle');
+            if (rankHeader) rankHeader.innerText = `${schoolInfo.title || 'តារាងកិត្តិយស និងស្ថិតិ'} សម្រាប់${periodName}`;
+            const periodTextEl = document.querySelector('#rankDetail .displayPeriodText');
+            if (periodTextEl) periodTextEl.innerText = periodName;
+
+            const calcResults = processCalculations(periodId, denominator);
+            
+            const rankList = document.getElementById('rankList');
+            rankList.innerHTML = '';
+            
+            let rankedStudents = students.filter(s => { let d = calcResults.data.find(x => x.id === s.id); return d && d.hasScores; });
+            
+            let tRanked = rankedStudents.length;
+            let fRanked = rankedStudents.filter(s => s.gender === 'ស្រី (ស)').length;
+            let passedStudents = rankedStudents.filter(s => calcResults.data.find(x => x.id === s.id).avg >= 25);
+            let tPassed = passedStudents.length;
+            let fPassed = passedStudents.filter(s => s.gender === 'ស្រី (ស)').length;
+
+            let passRate = tRanked > 0 ? ((tPassed / tRanked) * 100).toFixed(2) : 0;
+            let fPassRate = fRanked > 0 ? ((fPassed / fRanked) * 100).toFixed(2) : 0;
+
+            let khCount = { 'ល្អ':0, 'ល្អបង្គួរ':0, 'មធ្យម':0, 'ខ្សោយ':0, 'មិនចាត់ថ្នាក់':0 };
+            let enCount = { 'A':0, 'B':0, 'C':0, 'D':0, 'E':0, 'F':0, 'មិនចាត់ថ្នាក់':0 };
+
+            rankedStudents.forEach(s => {
+                let gradeObj = calcResults.data.find(x => x.id === s.id).grade;
+                if(khCount[gradeObj.kh] !== undefined) khCount[gradeObj.kh]++;
+                if(enCount[gradeObj.en] !== undefined) enCount[gradeObj.en]++;
+            });
+
+            document.getElementById('statTotal').innerText = tRanked;
+            document.getElementById('statTotalF').innerText = fRanked;
+            document.getElementById('statPass').innerText = tPassed;
+            document.getElementById('statPassF').innerText = fPassed;
+            document.getElementById('statPassPercent').innerText = passRate + '%';
+            document.getElementById('statPassPercentF').innerText = fPassRate + '%';
+            
+            document.getElementById('statKhGood').innerText = khCount['ល្អ'];
+            document.getElementById('statKhFair').innerText = khCount['ល្អបង្គួរ'];
+            document.getElementById('statKhAvg').innerText = khCount['មធ្យម'];
+            document.getElementById('statKhPoor').innerText = khCount['ខ្សោយ'];
+            
+            document.getElementById('statEnA').innerText = enCount['A'];
+            document.getElementById('statEnB').innerText = enCount['B'];
+            document.getElementById('statEnC').innerText = enCount['C'];
+            document.getElementById('statEnD').innerText = enCount['D'];
+            document.getElementById('statEnE').innerText = enCount['E'];
+            document.getElementById('statEnF').innerText = enCount['F'];
+
+            rankedStudents.sort((a, b) => {
+                let valA = calcResults.data.find(x => x.id === a.id).avg;
+                let valB = calcResults.data.find(x => x.id === b.id).avg;
+                return valB - valA;
+            });
+
+            if (rankedStudents.length === 0) {
+                document.getElementById('emptyRankState').classList.remove('hidden');
+                document.getElementById('standardRankContainer').classList.add('hidden');
+            } else {
+                document.getElementById('emptyRankState').classList.add('hidden');
+                document.getElementById('standardRankContainer').classList.remove('hidden');
+                
+                let mid = Math.ceil(rankedStudents.length / 2);
+                
+                for (let i = 0; i < mid; i++) {
+                    let s1 = rankedStudents[i];
+                    let s2 = rankedStudents[i + mid];
+                    
+                    let html = `<tr class="hover:bg-blue-50 dark:hover:bg-gray-700 transition">`;
+                    
+                    if (s1) {
+                        let d1 = calcResults.data.find(d => d.id === s1.id);
+                        html += `
+                            <td class="px-2 py-1.5 text-center font-bold border border-gray-300 dark:border-gray-600">${calcResults.ranks[s1.id].total}</td>
+                            <td class="px-3 py-1.5 font-bold text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600">${s1.name}</td>
+                            <td class="px-2 py-1.5 text-center text-xs text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">${s1.gender === 'ប្រុស (ប)' ? 'ប' : 'ស'}</td>
+                            <td class="px-2 py-1.5 text-center font-bold text-blue-900 dark:text-blue-300 border border-gray-300 dark:border-gray-600">${d1.total}</td>
+                            <td class="px-2 py-1.5 text-center font-bold text-blue-700 dark:text-blue-400 text-sm border border-gray-300 dark:border-gray-600">${d1.avg.toFixed(2)}</td>
+                            <td class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600"><span class="${d1.grade.color} px-1.5 py-0.5 rounded text-[10px] font-bold">${d1.grade.kh}</span></td>
+                        `;
+                    } else {
+                        html += `<td class="border border-gray-300 dark:border-gray-600"></td><td class="border border-gray-300 dark:border-gray-600"></td><td class="border border-gray-300 dark:border-gray-600"></td><td class="border border-gray-300 dark:border-gray-600"></td><td class="border border-gray-300 dark:border-gray-600"></td><td class="border border-gray-300 dark:border-gray-600"></td>`;
+                    }
+
+                    if (s2) {
+                        let d2 = calcResults.data.find(d => d.id === s2.id);
+                        html += `
+                            <td class="px-2 py-1.5 text-center font-bold border border-gray-300 dark:border-gray-600 border-l-4 border-l-gray-400 dark:border-l-gray-500">${calcResults.ranks[s2.id].total}</td>
+                            <td class="px-3 py-1.5 font-bold text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600">${s2.name}</td>
+                            <td class="px-2 py-1.5 text-center text-xs text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">${s2.gender === 'ប្រុស (ប)' ? 'ប' : 'ស'}</td>
+                            <td class="px-2 py-1.5 text-center font-bold text-blue-900 dark:text-blue-300 border border-gray-300 dark:border-gray-600">${d2.total}</td>
+                            <td class="px-2 py-1.5 text-center font-bold text-blue-700 dark:text-blue-400 text-sm border border-gray-300 dark:border-gray-600">${d2.avg.toFixed(2)}</td>
+                            <td class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600"><span class="${d2.grade.color} px-1.5 py-0.5 rounded text-[10px] font-bold">${d2.grade.kh}</span></td>
+                        `;
+                    } else {
+                        html += `<td class="border border-gray-300 dark:border-gray-600 border-l-4 border-l-gray-400 dark:border-l-gray-500"></td><td class="border border-gray-300 dark:border-gray-600"></td><td class="border border-gray-300 dark:border-gray-600"></td><td class="border border-gray-300 dark:border-gray-600"></td><td class="border border-gray-300 dark:border-gray-600"></td><td class="border border-gray-300 dark:border-gray-600"></td>`;
+                    }
+                    
+                    html += `</tr>`;
+                    rankList.innerHTML += html;
+                }
+            }
+        }
+
+        function renderAnnualRankTable() {
+            document.getElementById('standardRankContainer').style.display = 'none';
+            document.getElementById('annualRankContainer').style.display = 'block';
+
+            const rankHeader = document.querySelector('#rankDetail .displayTitle');
+            if (rankHeader) rankHeader.innerText = `${schoolInfo.title || 'តារាងកិត្តិយស និងស្ថិតិ'} ប្រចាំឆ្នាំ`;
+            const periodTextEl = document.querySelector('#rankDetail .displayPeriodText');
+            if (periodTextEl) periodTextEl.innerText = 'ប្រចាំឆ្នាំ';
+
+            let denomSem1 = periodDenominators['sem1'] || 18;
+            let denomSem2 = periodDenominators['sem2'] || 18;
+            const calcSem1 = processCalculations('sem1', denomSem1);
+            const calcSem2 = processCalculations('sem2', denomSem2);
+            
+            let annualData = [];
+            students.forEach(s => {
+                let s1 = calcSem1.data.find(d => d.id === s.id);
+                let s2 = calcSem2.data.find(d => d.id === s.id);
+                let avg1 = (s1 && s1.hasScores) ? s1.avg : 0;
+                let avg2 = (s2 && s2.hasScores) ? s2.avg : 0;
+                let annualAvg = (avg1 + avg2) / 2; 
+                let hasAnyScore = (s1 && s1.hasScores) || (s2 && s2.hasScores);
+                annualData.push({ id: s.id, name: s.name, gender: s.gender, avg1: avg1, avg2: avg2, annualAvg: annualAvg, hasAnyScore: hasAnyScore, grade: getGrade(annualAvg) });
+            });
+
+            annualData.sort((a, b) => b.annualAvg - a.annualAvg);
+            let ranks = {};
+            let currentRank = 1;
+            let rankedCount = 0;
+            annualData.forEach((s, idx) => {
+                if (!s.hasAnyScore) { ranks[s.id] = '-'; } 
+                else {
+                    if (idx > 0 && s.annualAvg === annualData[idx-1].annualAvg) { ranks[s.id] = ranks[annualData[idx-1].id]; } 
+                    else { ranks[s.id] = currentRank; }
+                    currentRank++;
+                    rankedCount++;
+                }
+            });
+
+            let tRanked = rankedCount;
+            let fRanked = annualData.filter(s => s.hasAnyScore && s.gender === 'ស្រី (ស)').length;
+            let tPassed = annualData.filter(s => s.hasAnyScore && s.annualAvg >= 25).length;
+            let fPassed = annualData.filter(s => s.hasAnyScore && s.annualAvg >= 25 && s.gender === 'ស្រី (ស)').length;
+
+            let passRate = tRanked > 0 ? ((tPassed / tRanked) * 100).toFixed(2) : 0;
+            let fPassRate = fRanked > 0 ? ((fPassed / fRanked) * 100).toFixed(2) : 0;
+
+            let khCount = { 'ល្អ':0, 'ល្អបង្គួរ':0, 'មធ្យម':0, 'ខ្សោយ':0, 'មិនចាត់ថ្នាក់':0 };
+            let enCount = { 'A':0, 'B':0, 'C':0, 'D':0, 'E':0, 'F':0, 'មិនចាត់ថ្នាក់':0 };
+
+            annualData.forEach(s => {
+                if (s.hasAnyScore) {
+                    if(khCount[s.grade.kh] !== undefined) khCount[s.grade.kh]++;
+                    if(enCount[s.grade.en] !== undefined) enCount[s.grade.en]++;
+                }
+            });
+
+            document.getElementById('statTotal').innerText = tRanked; document.getElementById('statTotalF').innerText = fRanked;
+            document.getElementById('statPass').innerText = tPassed; document.getElementById('statPassF').innerText = fPassed;
+            document.getElementById('statPassPercent').innerText = passRate + '%'; document.getElementById('statPassPercentF').innerText = fPassRate + '%';
+            document.getElementById('statKhGood').innerText = khCount['ល្អ']; document.getElementById('statKhFair').innerText = khCount['ល្អបង្គួរ'];
+            document.getElementById('statKhAvg').innerText = khCount['មធ្យម']; document.getElementById('statKhPoor').innerText = khCount['ខ្សោយ'];
+            document.getElementById('statEnA').innerText = enCount['A']; document.getElementById('statEnB').innerText = enCount['B'];
+            document.getElementById('statEnC').innerText = enCount['C']; document.getElementById('statEnD').innerText = enCount['D'];
+            document.getElementById('statEnE').innerText = enCount['E']; document.getElementById('statEnF').innerText = enCount['F'];
+
+            const tbody = document.getElementById('annualRankList');
+            tbody.innerHTML = '';
+            
+            let activeStudents = annualData.filter(s => s.hasAnyScore);
+            
+            if (activeStudents.length === 0) {
+                document.getElementById('emptyRankState').classList.remove('hidden');
+                document.getElementById('annualRankContainer').classList.add('hidden');
+            } else {
+                document.getElementById('emptyRankState').classList.add('hidden');
+                document.getElementById('annualRankContainer').classList.remove('hidden');
+
+                activeStudents.forEach((s, idx) => {
+                    let dispAvg1 = (s.avg1 > 0) ? s.avg1.toFixed(2) : '-';
+                    let dispAvg2 = (s.avg2 > 0) ? s.avg2.toFixed(2) : '-';
+                    let dispAnnualAvg = s.annualAvg.toFixed(2);
+                    let dispRank = ranks[s.id];
+                    let dispGrade = `<span class="${s.grade.color} px-1.5 py-0.5 rounded text-[10px] font-bold">${s.grade.kh}</span>`;
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-blue-50 dark:hover:bg-gray-700 transition">
+                            <td class="px-2 py-1.5 text-center font-bold border border-gray-300 dark:border-gray-600">${idx + 1}</td>
+                            <td class="px-3 py-1.5 font-bold text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-gray-600">${s.name}</td>
+                            <td class="px-2 py-1.5 text-center text-xs text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600">${s.gender === 'ប្រុស (ប)' ? 'ប' : 'ស'}</td>
+                            <td class="px-2 py-1.5 text-center font-bold text-blue-700 dark:text-blue-400 border border-gray-300 dark:border-gray-600">${dispAvg1}</td>
+                            <td class="px-2 py-1.5 text-center font-bold text-blue-700 dark:text-blue-400 border border-gray-300 dark:border-gray-600">${dispAvg2}</td>
+                            <td class="px-2 py-1.5 text-center font-bold text-red-600 dark:text-red-400 border border-gray-300 dark:border-gray-600">${dispAnnualAvg}</td>
+                            <td class="px-2 py-1.5 text-center font-bold text-red-600 dark:text-red-400 border border-gray-300 dark:border-gray-600">${dispRank}</td>
+                            <td class="px-2 py-1.5 text-center border border-gray-300 dark:border-gray-600">${dispGrade}</td>
+                        </tr>
+                    `;
+                });
+            }
+        }
+
+        function exportToExcel() {
+            if (students.length === 0) { alert("បញ្ជីទទេ!"); return; }
+
+            const periodId = document.getElementById('periodSelector').value;
+            const periodName = document.getElementById('periodSelector').options[document.getElementById('periodSelector').selectedIndex].text;
+            let denominator = parseFloat(document.getElementById('avgDenominator').value) || 1;
+            
+            const calcResults = processCalculations(periodId, denominator);
+            let excelData = [];
+            
+            excelData.push([schoolInfo.schoolName || "ឈ្មោះសាលា"]); 
+            excelData.push([`${schoolInfo.title || 'បញ្ជីស្រង់ពិន្ទុ'} សម្រាប់${periodName}`]); 
+            excelData.push(["ថ្នាក់ទី៖ " + (schoolInfo.className || "..."), "", "ឆ្នាំសិក្សា៖ " + (schoolInfo.academicYear || "...")]); 
+            excelData.push([]); 
+            
+            let headerRow = ["ល.រ", "ឈ្មោះ", "ភេទ", "ថ្ងៃខែឆ្នាំកំណើត"];
+            subjectList.forEach(sub => { headerRow.push(sub.name); headerRow.push("ចំណាត់ថ្នាក់-" + sub.name); });
+            headerRow.push("ពិន្ទុសរុប", "ចំណាត់ថ្នាក់រួម", "មធ្យមភាគ", "និទ្ទេស");
+            excelData.push(headerRow);
+
+            students.forEach((s, index) => {
+                let calcData = calcResults.data.find(d => d.id === s.id);
+                let sRanks = calcResults.ranks[s.id];
+                let dobFormatted = s.dob ? s.dob.split('-').reverse().join('/') : '';
+                
+                let rowData = [ index + 1, s.name, s.gender, dobFormatted ];
+                subjectList.forEach(sub => {
+                    rowData.push(calcData.scores[sub.id] || ""); 
+                    rowData.push(sRanks.subjects[sub.id] !== "-" ? sRanks.subjects[sub.id] : ""); 
+                });
+                if(calcData.hasScores) rowData.push(calcData.total, sRanks.total, calcData.avg.toFixed(2), calcData.grade.kh);
+                else rowData.push("", "", "", ""); 
+                
+                excelData.push(rowData);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            const totalColumns = headerRow.length;
+
+            ws['!merges'] = [
+                { s: { r: 0, c: 0 }, e: { r: 0, c: totalColumns - 1 } }, 
+                { s: { r: 1, c: 0 }, e: { r: 1, c: totalColumns - 1 } }  
+            ];
+
+            let colWidths = [{ wch: 5 }, { wch: 25 }, { wch: 10 }, { wch: 15 }];
+            subjectList.forEach(() => { colWidths.push({ wch: 12 }); colWidths.push({ wch: 15 }); });
+            colWidths.push({ wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 18 });
+            ws['!cols'] = colWidths;
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, `លទ្ធផល`);
+            XLSX.writeFile(wb, `សៀវភៅពិន្ទុ_${periodName}.xlsx`);
+        }
+
+        function exportReportToExcel() {
+            const monthlyTab = document.getElementById('tab_monthly_report');
+            const annualTab = document.getElementById('tab_annual_report');
+
+            if (monthlyTab && monthlyTab.classList.contains('active')) {
+                exportMonthlyReportToExcel();
+            } else if (annualTab && annualTab.classList.contains('active')) {
+                exportAnnualReportToExcel();
+            } else {
+                alert('មិនអាចទាញយកបានទេ សូមជ្រើសរើសផ្ទាំងរបាយការណ៍ណាមួយ។');
+            }
+        }
+
+        function exportMonthlyReportToExcel() {
+            // --- 1. Get Data (same logic as renderReport) ---
+            const periodSelector = document.getElementById('periodSelector');
+            const periodId = periodSelector.value;
+            const periodName = periodSelector.options[periodSelector.selectedIndex].text;
+            let denominator = parseFloat(document.getElementById('avgDenominator').value) || 1;
+            const calcResults = processCalculations(periodId, denominator);
+
+            let totalSt = students.length;
+            let totalFemale = students.filter(s => s.gender === 'ស្រី (ស)').length;
+
+            let statsKh = { 'ល្អ': {t:0, f:0}, 'ល្អបង្គួរ': {t:0, f:0}, 'មធ្យម': {t:0, f:0}, 'ខ្សោយ': {t:0, f:0}, 'មិនចាត់ថ្នាក់': {t:0, f:0} };
+            let statsEn = { 'A': {t:0, f:0}, 'B': {t:0, f:0}, 'C': {t:0, f:0}, 'D': {t:0, f:0}, 'E': {t:0, f:0}, 'F': {t:0, f:0} };
+
+            students.forEach(s => {
+                let isF = s.gender === 'ស្រី (ស)';
+                let d = calcResults.data.find(x => x.id === s.id);
+
+                if(d && d.hasScores) {
+                    if (statsKh[d.grade.kh]) { statsKh[d.grade.kh].t++; if (isF) statsKh[d.grade.kh].f++; }
+                    if (statsEn[d.grade.en]) { statsEn[d.grade.en].t++; if (isF) statsEn[d.grade.en].f++; }
+                } else { statsKh['មិនចាត់ថ្នាក់'].t++; if (isF) statsKh['មិនចាត់ថ្នាក់'].f++; }
+            });
+            const getP = (val) => totalSt > 0 ? ((val / totalSt) * 100) : 0; // Return number for Excel formatting
+
+            // --- 2. Build Excel Data Array (AOA) ---
+            let excelData = [];
+            excelData.push([schoolInfo.schoolName || "ឈ្មោះសាលា"]);
+            excelData.push([`របាយការណ៍សរុបប្រចាំ${periodName}`]);
+            excelData.push([`ថ្នាក់ទី៖ ${schoolInfo.className || '...'}`, ``, `ឆ្នាំសិក្សា៖ ${schoolInfo.academicYear || '...'}`]);
+            excelData.push([]); // Spacer
+
+            // Table 1
+            excelData.push(["របាយការណ៍តាមនិទ្ទេស (ខ្មែរ)"]);
+            excelData.push(["ល.រ", "សរុបសិស្ស", "ស្រី", "ល្អ (សរុប)", "ល្អ (ស្រី)", "ល្អ (%)", "ល្អបង្គួរ (សរុប)", "ល្អបង្គួរ (ស្រី)", "ល្អបង្គួរ (%)", "មធ្យម (សរុប)", "មធ្យម (ស្រី)", "មធ្យម (%)", "ខ្សោយ (សរុប)", "ខ្សោយ (ស្រី)", "ខ្សោយ (%)", "មិនចាត់ថ្នាក់ (សរុប)", "មិនចាត់ថ្នាក់ (ស្រី)", "មិនចាត់ថ្នាក់ (%)", "ផ្សេងៗ"]);
+            excelData.push([1, `${totalSt} នាក់`, `${totalFemale} នាក់`, statsKh['ល្អ'].t, statsKh['ល្អ'].f, getP(statsKh['ល្អ'].t), statsKh['ល្អបង្គួរ'].t, statsKh['ល្អបង្គួរ'].f, getP(statsKh['ល្អបង្គួរ'].t), statsKh['មធ្យម'].t, statsKh['មធ្យម'].f, getP(statsKh['មធ្យម'].t), statsKh['ខ្សោយ'].t, statsKh['ខ្សោយ'].f, getP(statsKh['ខ្សោយ'].t), statsKh['មិនចាត់ថ្នាក់'].t, statsKh['មិនចាត់ថ្នាក់'].f, getP(statsKh['មិនចាត់ថ្នាក់'].t), 0 ]);
+            excelData.push([]); // Spacer
+
+            // Table 2
+            excelData.push(["របាយការណ៍តាមនិទ្ទេស (A-F)"]);
+            excelData.push(["ល.រ", "ឈ្មោះសាលា", "សរុបសិស្ស", "ស្រី", "បោះបង់", "ស្រី", "A (សរុប)", "A (ស្រី)", "B (សរុប)", "B (ស្រី)", "C (សរុប)", "C (ស្រី)", "D (សរុប)", "D (ស្រី)", "E (សរុប)", "E (ស្រី)", "F (សរុប)", "F (ស្រី)", "ផ្សេងៗ"]);
+            excelData.push([1, schoolInfo.schoolName || '...', totalSt, totalFemale, 0, 0, statsEn['A'].t, statsEn['A'].f, statsEn['B'].t, statsEn['B'].f, statsEn['C'].t, statsEn['C'].f, statsEn['D'].t, statsEn['D'].f, statsEn['E'].t, statsEn['E'].f, statsEn['F'].t, statsEn['F'].f, ""]);
+
+            // --- 3. Create and Download Workbook ---
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            ws['!merges'] = [ { s: { r: 0, c: 0 }, e: { r: 0, c: 18 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 18 } }, { s: { r: 4, c: 0 }, e: { r: 4, c: 18 } }, { s: { r: 8, c: 0 }, e: { r: 8, c: 18 } }, ];
+            ws['!cols'] = [ {wch:5}, {wch:15}, {wch:10}, {wch:10}, {wch:10}, {wch:10}, {wch:15}, {wch:15}, {wch:15}, {wch:10}, {wch:10}, {wch:10}, {wch:10}, {wch:10}, {wch:10}, {wch:15}, {wch:15}, {wch:15}, {wch:10} ];
+
+            const percent_fmt = "0.00%";
+            const percent_cols = [5, 8, 11, 14, 17];
+            const cell_address = {c:0, r:6}; // Start row of data
+            for(let c of percent_cols) {
+                cell_address.c = c;
+                let cell = XLSX.utils.encode_cell(cell_address);
+                if(ws[cell]) { ws[cell].t = 'n'; ws[cell].v = ws[cell].v / 100; ws[cell].z = percent_fmt; }
+            }
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, `របាយការណ៍ ${periodName}`);
+            XLSX.writeFile(wb, `របាយការណ៍_${periodName}.xlsx`);
+        }
+
+        function exportAnnualReportToExcel() {
+            // --- 1. Get Data (same logic as renderAnnualReport) ---
+            let denomSem1 = periodDenominators['sem1'] || 18;
+            let denomSem2 = periodDenominators['sem2'] || 18;
+            const calcSem1 = processCalculations('sem1', denomSem1);
+            const calcSem2 = processCalculations('sem2', denomSem2);
+            
+            let annualData = [];
+            students.forEach(s => {
+                let s1 = calcSem1.data.find(d => d.id === s.id);
+                let s2 = calcSem2.data.find(d => d.id === s.id);
+                let avg1 = (s1 && s1.hasScores) ? s1.avg : 0;
+                let avg2 = (s2 && s2.hasScores) ? s2.avg : 0;
+                let annualAvg = (avg1 + avg2) / 2; 
+                let hasAnyScore = (s1 && s1.hasScores) || (s2 && s2.hasScores);
+                annualData.push({ id: s.id, name: s.name, gender: s.gender, avg1: avg1, avg2: avg2, annualAvg: annualAvg, hasAnyScore: hasAnyScore, grade: getGrade(annualAvg) });
+            });
+
+            annualData.sort((a, b) => b.annualAvg - a.annualAvg);
+            let ranks = {};
+            let currentRank = 1;
+            annualData.forEach((s, idx) => {
+                if (!s.hasAnyScore) { ranks[s.id] = '-'; } 
+                else {
+                    if (idx > 0 && s.annualAvg === annualData[idx-1].annualAvg) { ranks[s.id] = ranks[annualData[idx-1].id]; } 
+                    else { ranks[s.id] = currentRank; }
+                    currentRank++;
+                }
+            });
+
+            // --- 2. Build Excel Data Array (AOA) ---
+            let excelData = [];
+            excelData.push([schoolInfo.schoolName || "ឈ្មោះសាលា"]);
+            excelData.push([`របាយការណ៍សរុបប្រចាំឆ្នាំ`]);
+            excelData.push([`ថ្នាក់ទី៖ ${schoolInfo.className || '...'}`, ``, `ឆ្នាំសិក្សា៖ ${schoolInfo.academicYear || '...'}`]);
+            excelData.push([]); // Spacer
+            excelData.push(["ល.រ", "អត្តលេខ", "នាម និងគោត្តនាម", "ភេទ", "មធ្យមភាគ ឆ១", "មធ្យមភាគ ឆ២", "មធ្យមភាគប្រចាំឆ្នាំ", "ចំណាត់ថ្នាក់", "និទ្ទេស", "ផ្សេងៗ"]);
+
+            annualData.forEach((s, idx) => {
+                excelData.push([ idx + 1, "", s.name, s.gender === 'ប្រុស (ប)' ? 'ប' : 'ស', (s.avg1 > 0) ? s.avg1.toFixed(2) : '-', (s.avg2 > 0) ? s.avg2.toFixed(2) : '-', s.hasAnyScore ? s.annualAvg.toFixed(2) : '-', s.hasAnyScore ? ranks[s.id] : '-', s.hasAnyScore ? s.grade.kh : '-', "" ]);
+            });
+            excelData.push([]); // Spacer
+
+            // Summary Table
+            let stats = { total: 0, totalF: 0, pass: 0, passF: 0, good: 0, goodF: 0, fair: 0, fairF: 0, avg: 0, avgF: 0, poor: 0, poorF: 0, unranked: 0, unrankedF: 0 };
+            annualData.forEach(s => {
+                let isF = s.gender === 'ស្រី (ស)';
+                stats.total++; if (isF) stats.totalF++;
+                if (s.hasAnyScore) {
+                    if (s.annualAvg >= 25) { stats.pass++; if (isF) stats.passF++; }
+                    if (s.grade.kh === 'ល្អ') { stats.good++; if(isF) stats.goodF++; }
+                    else if (s.grade.kh === 'ល្អបង្គួរ') { stats.fair++; if(isF) stats.fairF++; }
+                    else if (s.grade.kh === 'មធ្យម') { stats.avg++; if(isF) stats.avgF++; }
+                    else if (s.grade.kh === 'ខ្សោយ') { stats.poor++; if(isF) stats.poorF++; }
+                    else { stats.unranked++; if(isF) stats.unrankedF++; }
+                } else { stats.unranked++; if(isF) stats.unrankedF++; }
+            });
+            const getP = (val) => stats.total > 0 ? `${((val / stats.total) * 100).toFixed(2)}%` : '0%';
+
+            excelData.push([`-បញ្ចប់បញ្ជីត្រឹមចំនួនសិស្ស ${stats.total}នាក់ ស្រី ${stats.totalF}នាក់`]);
+            excelData.push([`-បានប្រឡងជាប់ សរុប: ${stats.pass}នាក់ ស្រី ${stats.passF}នាក់ ស្មើនឹង ${getP(stats.pass)}`, `-និទ្ទេសមធ្យម សរុប: ${stats.avg}នាក់ ស្រី ${stats.avgF}នាក់ ស្មើនឹង ${getP(stats.avg)}`]);
+            excelData.push([`-និទ្ទេសល្អ សរុប: ${stats.good}នាក់ ស្រី ${stats.goodF}នាក់ ស្មើនឹង ${getP(stats.good)}`, `-និទ្ទេសខ្សោយ សរុប: ${stats.poor}នាក់ ស្រី ${stats.poorF}នាក់ ស្មើនឹង ${getP(stats.poor)}`]);
+            excelData.push([`-និទ្ទេសល្អបង្គួរ សរុប: ${stats.fair}នាក់ ស្រី ${stats.fairF}នាក់ ស្មើនឹង ${getP(stats.fair)}`, `-គ្មានចំណាត់ថ្នាក់ សរុប: ${stats.unranked}នាក់ ស្រី ${stats.unrankedF}នាក់ ស្មើនឹង ${getP(stats.unranked)}`]);
+
+            // --- 3. Create and Download Workbook ---
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            const studentDataEndRow = 4 + annualData.length;
+            ws['!merges'] = [ { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } }, { s: { r: studentDataEndRow + 2, c: 0 }, e: { r: studentDataEndRow + 2, c: 9 } }, ];
+            ws['!cols'] = [ {wch:5}, {wch:10}, {wch:25}, {wch:5}, {wch:15}, {wch:15}, {wch:20}, {wch:12}, {wch:12}, {wch:15} ];
+
+            for (let i in ws) {
+                if (i.startsWith('!')) continue;
+                let cellRef = XLSX.utils.decode_cell(i);
+                let r = cellRef.r;
+            
+            if (!ws[i].s) ws[i].s = {};
+
+            if (r === 0 || r === 1 || r === 4) {
+                ws[i].s.font = { name: "Khmer OS Muol Light", sz: (r === 0 || r === 1) ? 14 : 11 };
+                ws[i].s.alignment = { horizontal: "center", vertical: "center" };
+            } else {
+                ws[i].s.font = { name: "Khmer OS Battambang", sz: 11 };
+                ws[i].s.alignment = { vertical: "center" };
+            }
+
+            if (r >= 4 && r !== studentDataEndRow + 1) {
+                ws[i].s.border = { top: { style: "thin", color: { rgb: "000000" } }, bottom: { style: "thin", color: { rgb: "000000" } }, left: { style: "thin", color: { rgb: "000000" } }, right: { style: "thin", color: { rgb: "000000" } } };
+            }
+            }
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, `របាយការណ៍ប្រចាំឆ្នាំ`);
+            XLSX.writeFile(wb, `របាយការណ៍_ប្រចាំឆ្នាំ_${schoolInfo.academicYear}.xlsx`);
+        }
+
+        // Initialization
+        buildUI();
+        showDashboard();
+        updateDashboardStats();
+        // ទាញទិន្នន័យពី Firebase មុននឹងបង្ហាញកូដ
+        loadDataFromFirebase();
+    </script>
+</body>
+</html>
