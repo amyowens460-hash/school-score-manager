@@ -143,7 +143,7 @@
                 <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/20 text-white mb-4 shadow-inner border border-white/30">
                     <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                 </div>
-                <h2 class="text-2xl sm:text-3xl font-bold text-white font-khmer mb-1">ចូលប្រព័ន្ធគ្រប់គ្រង</h2>
+                <h2 id="authTitle" class="text-2xl sm:text-3xl font-bold text-white font-khmer mb-1">ចូលប្រព័ន្ធគ្រប់គ្រង</h2>
                 <p class="text-blue-200 text-sm mt-2 font-medium tracking-wide">SCHOOL MANAGEMENT SYSTEM</p>
             </div>
             <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-6">
@@ -154,7 +154,7 @@
                 <div>
                     <div class="flex justify-between items-center mb-2">
                         <label class="block text-sm font-bold text-blue-100">ពាក្យសម្ងាត់ (Password)</label>
-                        <a href="#" onclick="handleForgotPassword(event)" class="text-sm font-medium text-blue-300 hover:text-blue-100 transition underline decoration-blue-400/30 underline-offset-2">ភ្លេចពាក្យសម្ងាត់?</a>
+                        <a href="#" id="forgotPassLink" onclick="handleForgotPassword(event)" class="text-sm font-medium text-blue-300 hover:text-blue-100 transition underline decoration-blue-400/30 underline-offset-2">ភ្លេចពាក្យសម្ងាត់?</a>
                     </div>
                     <input type="password" id="loginPassword" required class="w-full px-5 py-3 rounded-xl border border-white/20 bg-white/10 text-white placeholder-blue-300 focus:ring-2 focus:ring-blue-400 focus:bg-white/20 outline-none transition duration-300 shadow-inner" placeholder="••••••••">
                 </div>
@@ -163,6 +163,12 @@
                     <span id="loginBtnText" class="text-lg">ចូលប្រព័ន្ធ</span>
                     <svg id="loginSpinner" class="hidden w-5 h-5 animate-spin text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
                 </button>
+                <div class="text-center mt-4">
+                    <p class="text-sm text-blue-200">
+                        <span id="authToggleText">មិនទាន់មានគណនីមែនទេ?</span> 
+                        <a href="#" onclick="toggleAuthMode(event)" id="authToggleLink" class="font-bold text-white hover:text-blue-300 underline decoration-blue-400/50 underline-offset-2 transition">ចុះឈ្មោះឥឡូវនេះ</a>
+                    </p>
+                </div>
             </form>
         </div>
     </div>
@@ -2713,6 +2719,36 @@
             }
         });
 
+        let isSignUpMode = false;
+
+        function toggleAuthMode(e) {
+            e.preventDefault();
+            isSignUpMode = !isSignUpMode;
+            
+            const title = document.getElementById('authTitle');
+            const btnText = document.getElementById('loginBtnText');
+            const toggleText = document.getElementById('authToggleText');
+            const toggleLink = document.getElementById('authToggleLink');
+            const forgotPass = document.getElementById('forgotPassLink');
+            const errDiv = document.getElementById('loginError');
+            
+            errDiv.classList.add('hidden'); // Clear any previous errors
+
+            if (isSignUpMode) {
+                title.innerText = "ចុះឈ្មោះប្រើប្រាស់";
+                btnText.innerText = "បង្កើតគណនី";
+                toggleText.innerText = "មានគណនីរួចហើយ?";
+                toggleLink.innerText = "ចូលប្រព័ន្ធ";
+                forgotPass.classList.add('hidden');
+            } else {
+                title.innerText = "ចូលប្រព័ន្ធគ្រប់គ្រង";
+                btnText.innerText = "ចូលប្រព័ន្ធ";
+                toggleText.innerText = "មិនទាន់មានគណនីមែនទេ?";
+                toggleLink.innerText = "ចុះឈ្មោះឥឡូវនេះ";
+                forgotPass.classList.remove('hidden');
+            }
+        }
+
         function handleLogin(e) {
             e.preventDefault();
             const email = document.getElementById('loginEmail').value;
@@ -2721,17 +2757,28 @@
             const spinner = document.getElementById('loginSpinner');
             const errDiv = document.getElementById('loginError');
 
-            btnText.innerText = "កំពុងផ្ទៀងផ្ទាត់...";
+            btnText.innerText = isSignUpMode ? "កំពុងបង្កើតគណនី..." : "កំពុងផ្ទៀងផ្ទាត់...";
             spinner.classList.remove('hidden');
             errDiv.className = "text-red-200 text-sm font-bold text-center bg-red-900/50 border border-red-500/50 p-3 rounded-xl backdrop-blur-md hidden";
             errDiv.classList.add('hidden');
 
-            auth.signInWithEmailAndPassword(email, pass).catch((error) => {
-                btnText.innerText = "ចូលប្រព័ន្ធ";
-                spinner.classList.add('hidden');
-                errDiv.innerText = "អ៊ីមែល ឬ ពាក្យសម្ងាត់មិនត្រឹមត្រូវទេ!";
-                errDiv.classList.remove('hidden');
-            });
+            if (isSignUpMode) {
+                auth.createUserWithEmailAndPassword(email, pass).catch((error) => {
+                    btnText.innerText = "បង្កើតគណនី";
+                    spinner.classList.add('hidden');
+                    if (error.code === 'auth/email-already-in-use') errDiv.innerText = "អ៊ីមែលនេះមានអ្នកប្រើប្រាស់រួចហើយ!";
+                    else if (error.code === 'auth/weak-password') errDiv.innerText = "ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច ៦ ខ្ទង់!";
+                    else errDiv.innerText = "មានបញ្ហា: " + error.message;
+                    errDiv.classList.remove('hidden');
+                });
+            } else {
+                auth.signInWithEmailAndPassword(email, pass).catch((error) => {
+                    btnText.innerText = "ចូលប្រព័ន្ធ";
+                    spinner.classList.add('hidden');
+                    errDiv.innerText = "អ៊ីមែល ឬ ពាក្យសម្ងាត់មិនត្រឹមត្រូវទេ!";
+                    errDiv.classList.remove('hidden');
+                });
+            }
         }
 
         function handleForgotPassword(e) {
