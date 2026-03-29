@@ -578,32 +578,59 @@
                 </div>
             </div>
             
-            <div class="overflow-x-auto rounded-lg">
-                <table class="w-full text-left text-sm border-collapse border border-gray-300 dark:border-gray-600 rank-table-print">
-                    <colgroup>
-                        <col width="6%"><col width="22%"><col width="5%"><col width="7%"><col width="6%"><col width="4%">
-                        <col width="6%"><col width="22%"><col width="5%"><col width="7%"><col width="6%"><col width="4%">
-                    </colgroup>
-                    <thead class="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
-                        <tr>
-                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ល.រ</th>
-                            <th class="px-3 py-2 font-bold border border-gray-300 dark:border-gray-600">គោត្តនាម-នាម</th>
-                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ភេទ</th>
-                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ពិន្ទុសរុប</th>
-                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">មធ្យមភាគ</th>
-                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">និទ្ទេស</th>
-                            
-                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600 border-l-4 border-l-gray-400 dark:border-l-gray-500">ល.រ</th>
-                            <th class="px-3 py-2 font-bold border border-gray-300 dark:border-gray-600">គោត្តនាម-នាម</th>
-                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ភេទ</th>
-                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ពិន្ទុសរុប</th>
-                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">មធ្យមភាគ</th>
-                            <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">និទ្ទេស</th>
-                        </tr>
-                    </thead>
-                    <tbody id="rankList" class="bg-white dark:bg-gray-800">
-                    </tbody>
-                </table>
+            <div id="standardRankContainer">
+                <div class="overflow-x-auto rounded-lg">
+                    <table class="w-full text-left text-sm border-collapse border border-gray-300 dark:border-gray-600 rank-table-print">
+                        <colgroup>
+                            <col width="6%"><col width="22%"><col width="5%"><col width="7%"><col width="6%"><col width="4%">
+                            <col width="6%"><col width="22%"><col width="5%"><col width="7%"><col width="6%"><col width="4%">
+                        </colgroup>
+                        <thead class="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                            <tr>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ល.រ</th>
+                                <th class="px-3 py-2 font-bold border border-gray-300 dark:border-gray-600">គោត្តនាម-នាម</th>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ភេទ</th>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ពិន្ទុសរុប</th>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">មធ្យមភាគ</th>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">និទ្ទេស</th>
+                                
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600 border-l-4 border-l-gray-400 dark:border-l-gray-500">ល.រ</th>
+                                <th class="px-3 py-2 font-bold border border-gray-300 dark:border-gray-600">គោត្តនាម-នាម</th>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ភេទ</th>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ពិន្ទុសរុប</th>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">មធ្យមភាគ</th>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">និទ្ទេស</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rankList" class="bg-white dark:bg-gray-800">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="annualRankContainer" class="hidden">
+                <div class="overflow-x-auto rounded-lg">
+                    <table class="w-full text-left text-sm border-collapse border border-gray-300 dark:border-gray-600 rank-table-print">
+                        <colgroup>
+                            <col width="6%"><col width="22%"><col width="5%"><col width="7%"><col width="6%"><col width="4%">
+                            <col width="6%"><col width="22%"><col width="5%"><col width="7%"><col width="6%"><col width="4%">
+                        </colgroup>
+                        <thead class="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                            <tr>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ល.រ</th>
+                                <th class="px-3 py-2 font-bold border border-gray-300 dark:border-gray-600">គោត្តនាម-នាម</th>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ភេទ</th>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">មធ្យមភាគ ឆ១</th>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">មធ្យមភាគ ឆ២</th>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">មធ្យមភាគប្រចាំឆ្នាំ</th>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">ចំណាត់ថ្នាក់</th>
+                                <th class="px-2 py-2 text-center font-bold border border-gray-300 dark:border-gray-600">និទ្ទេស</th>
+                            </tr>
+                        </thead>
+                        <tbody id="annualRankList" class="bg-white dark:bg-gray-800">
+                        </tbody>
+                    </table>
+                </div>
             </div>
             <div id="emptyRankState" class="p-10 text-center text-gray-500 dark:text-gray-400 font-medium bg-gray-50 dark:bg-gray-800/50 mt-4 rounded-lg no-print">មិនមានទិន្នន័យពិន្ទុសម្រាប់បង្ហាញទេ។</div>
             <div class="print-footer default-print-footer">
@@ -885,6 +912,9 @@
         const db = firebase.firestore();
         const auth = firebase.auth();
 
+        // Global variable to store the current user's UID
+        let currentUserUid = null;
+
         // ២. អថេរសម្រាប់ផ្ទុកទិន្នន័យ (លុប localStorage ចេញ)
         let students = [];
         let schoolInfo = {
@@ -899,6 +929,37 @@
         let currentScoringStudentId = null; 
         let currentRankTab = 'current';
         let deletedHistory = [];
+
+        // ៤. អនុគមន៍ថ្មីសម្រាប់រក្សាទុកទិន្នន័យទាំងអស់ទៅកាន់ Firebase ពេលមានការកែប្រែ
+        function saveAllDataToFirebase(silent = false) {
+            if (!currentUserUid) {
+                console.error("No authenticated user to save data for.");
+                if (!silent) alert("អ្នកមិនទាន់បាន Login ទេ! មិនអាចរក្សាទុកទិន្នន័យបានទេ។");
+                return Promise.reject("No authenticated user.");
+            }
+
+            const overlay = document.getElementById('globalSavingOverlay');
+            if (!silent && overlay) {
+                overlay.classList.remove('hidden');
+                overlay.classList.add('flex');
+            }
+            
+            return db.collection("users").doc(currentUserUid).set({ // Changed collection and document path
+                students: students,
+                schoolInfo: schoolInfo,
+                scheduleData: scheduleData,
+                seatingData: seatingData,
+                bookBorrowingData: bookBorrowingData,
+                periodDenominators: periodDenominators
+            }).then(() => {
+                if (!silent && overlay) { overlay.classList.add('hidden'); overlay.classList.remove('flex'); }
+            }).catch((error) => {
+                if (!silent && overlay) { overlay.classList.add('hidden'); overlay.classList.remove('flex'); }
+                console.error("Error saving document for user " + currentUserUid + ": ", error);
+                if (!silent) alert("បរាជ័យក្នុងការរក្សាទុកទិន្នន័យ! សូមពិនិត្យមើលអ៊ីនធឺណិតរបស់អ្នក។");
+                return Promise.reject(error);
+            });
+        }
 
         function resetNavButtons() {
             const btns = ['btn_dashboard', 'btn_table', 'btn_rank', 'btn_admin', 'btn_register', 'btn_report'];
@@ -968,12 +1029,18 @@
             renderHonorRoll();
         }
 
-        // ៣. អនុគមន៍សម្រាប់ទាញយកទិន្នន័យពី Firebase នៅពេលបើកកម្មវិធីដំបូង
+        // ៣. អនុគមន៍សម្រាប់ទាញយកទិន្នន័យពី Firebase នៅពេលបើកកម្មវិធីដំបូង (សម្រាប់ User នីមួយៗ)
         function loadDataFromFirebase() {
+            if (!currentUserUid) {
+                console.error("No authenticated user to load data for.");
+                // Optionally, redirect to login or show an error
+                return;
+            }
+
             // បង្ហាញ Loading ...
             document.getElementById('dashboardStudentCount').innerText = 'កំពុងទាញយក...';
             
-            db.collection("schoolApp").doc("mainData").get().then((doc) => {
+            db.collection("users").doc(currentUserUid).get().then((doc) => { // Changed collection and document path
                 if (doc.exists) {
                     const data = doc.data();
                     students = data.students || [];
@@ -982,14 +1049,20 @@
                     seatingData = data.seatingData || {};
                     bookBorrowingData = data.bookBorrowingData || {};
                     periodDenominators = data.periodDenominators || {};
+                } else {
+                    // If no document exists for this user, it's a new user.
+                    // Initialize with default empty data or a template.
+                    console.log("No data found for this user, initializing with defaults.");
+                    // schoolInfo already has defaults, other variables are empty by default.
+                    // Save initial data for the new user
+                    saveAllDataToFirebase(true); // Save silently
                 }
                 
                 // បន្ទាប់ពីទាញទិន្នន័យបានជោគជ័យ ទើបឱ្យវាបង្ហាញ UI
                 buildUI();
                 showDashboard();
-                updateDashboardStats();
             }).catch((error) => {
-                console.error("Error loading data: ", error);
+                console.error("Error loading data for user " + currentUserUid + ": ", error);
                 alert("មិនអាចភ្ជាប់ទៅកាន់ Database បានទេ!");
             });
         }
@@ -1564,30 +1637,6 @@
             document.getElementById('avgDenominator').value = periodDenominators[initialPeriod] || 18;
         }
 
-        // ៤. អនុគមន៍ថ្មីសម្រាប់រក្សាទុកទិន្នន័យទាំងអស់ទៅកាន់ Firebase ពេលមានការកែប្រែ
-        function saveAllDataToFirebase(silent = false) {
-            const overlay = document.getElementById('globalSavingOverlay');
-            if (!silent && overlay) {
-                overlay.classList.remove('hidden');
-                overlay.classList.add('flex');
-            }
-            
-            return db.collection("schoolApp").doc("mainData").set({
-                students: students,
-                schoolInfo: schoolInfo,
-                scheduleData: scheduleData,
-                seatingData: seatingData,
-                bookBorrowingData: bookBorrowingData,
-                periodDenominators: periodDenominators
-            }).then(() => {
-                if (!silent && overlay) { overlay.classList.add('hidden'); overlay.classList.remove('flex'); }
-            }).catch((error) => {
-                if (!silent && overlay) { overlay.classList.add('hidden'); overlay.classList.remove('flex'); }
-                console.error("Error saving document: ", error);
-                if (!silent) alert("បរាជ័យក្នុងការរក្សាទុកទិន្នន័យ! សូមពិនិត្យមើលអ៊ីនធឺណិតរបស់អ្នក។");
-            });
-        }
-
         function importFromExcel(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -1635,7 +1684,10 @@
                         alert(`🎉 បានទាញយកឈ្មោះសិស្សចំនួន ${importedCount} នាក់ដោយជោគជ័យ។`);
                         if(document.getElementById('registerDetail').classList.contains('active')) showDetail('tableDetail');
                     } else alert("⚠️ រកមិនឃើញទិន្នន័យត្រឹមត្រូវទេ។");
-                } catch (error) { alert("មានបញ្ហាក្នុងការអានឯកសារ Excel។"); }
+                } catch (error) {
+                    console.error("Error importing Excel file:", error); // Log the detailed error
+                    alert("មានបញ្ហាក្នុងការអានឯកសារ Excel។ សូមពិនិត្យមើល Console (F12) សម្រាប់ព័ត៌មានលម្អិត។");
+                }
                 event.target.value = '';
             };
             reader.readAsArrayBuffer(file);
@@ -2270,9 +2322,10 @@
                 return;
             }
 
-            document.getElementById('standardRankContainer').style.display = 'block';
+            let standardContainer = document.getElementById('standardRankContainer');
+            if (standardContainer) standardContainer.style.display = 'block';
             let annualContainer = document.getElementById('annualRankContainer');
-            if (annualContainer) annualContainer.style.display = 'none';
+            if (annualContainer) annualContainer.style.display = 'none'; // Only hide if it exists
 
             const rankHeader = document.querySelector('#rankDetail .displayTitle');
             if (rankHeader) rankHeader.innerText = `${schoolInfo.title || 'តារាងកិត្តិយស និងស្ថិតិ'} សម្រាប់${periodName}`;
@@ -2706,12 +2759,14 @@
         // --- ប្រព័ន្ធ Login (Authentication) ---
         auth.onAuthStateChanged((user) => {
             if (user) {
+                currentUserUid = user.uid; // Store the UID of the logged-in user
                 // ពេល Login ជោគជ័យ បិទផ្ទាំង Login ហើយបង្ហាញទិន្នន័យ
                 document.getElementById('loginScreen').classList.add('hidden');
                 document.getElementById('mainAppContainer').classList.remove('hidden');
                 document.getElementById('mainAppContainer').classList.add('flex');
                 loadDataFromFirebase();
             } else {
+                currentUserUid = null; // Clear UID on logout
                 // ពេលមិនទាន់ Login ឬ ចុច Logout
                 document.getElementById('loginScreen').classList.remove('hidden');
                 document.getElementById('mainAppContainer').classList.add('hidden');
